@@ -1,115 +1,159 @@
-/**
- * storage.js
- *
- * Uses Firebase Realtime Database for shared, real-time data.
- *
- * SETUP (one-time):
- * 1. Go to https://console.firebase.google.com
- * 2. Create a project (free Spark plan is fine)
- * 3. Create a Realtime Database (start in test mode for now)
- * 4. Copy your config values into FIREBASE_CONFIG below
- * 5. In Firebase Console > Realtime Database > Rules, set:
- *    {
- *      "rules": {
- *        ".read": "auth != null",
- *        ".write": "auth != null"
- *      }
- *    }
- *    (or keep test mode rules while you're getting started)
- */
+// ── Firebase configuration ───────────────────────────────────────────────────
+// Set this to your Firebase Realtime Database URL to pull prize spending
+// automatically from the Prize Manager app.
+// e.g. 'https://your-project-default-rtdb.firebaseio.com'
+// Leave as empty string '' if not set up yet.
+window.FIREBASE_DB_URL = '';
 
-const FIREBASE_CONFIG = {
-  apiKey: "REPLACE_WITH_YOUR_API_KEY",
-  authDomain: "REPLACE_WITH_YOUR_AUTH_DOMAIN",
-  databaseURL: "REPLACE_WITH_YOUR_DATABASE_URL",
-  projectId: "REPLACE_WITH_YOUR_PROJECT_ID",
-};
+const SK = 'soiree_hq_2027';
+let S = {};
 
-// ---------------------------------------------------------------------------
-// Internal helpers — do not edit below unless you know Firebase well
-// ---------------------------------------------------------------------------
+// ── Migration: called after load, patches missing/changed fields
+// without ever overwriting data the user has entered.
+function migrateState() {
+  // Ensure top-level keys exist
+  if (!S.attendance)   S.attendance   = JSON.parse(JSON.stringify(DEFAULT_DATA.attendance));
+  if (S.ticketPrice === undefined) S.ticketPrice = 0;
 
-let _db = null;
-let _listeners = {};
+  // Subtable arrays — add if missing, never remove user rows
+  ['tshirts','hats','totes','prizes','swag','decorations','misc'].forEach(key => {
+    if (!S[key]) S[key] = JSON.parse(JSON.stringify(DEFAULT_DATA[key]));
+  });
 
-async function initFirebase() {
-  if (_db) return _db;
+  // Expenses — merge by id: keep user's spent/notes/expanded,
+  // but restore type/structure fields if they're wrong or missing
+  const defMap = {};
+  DEFAULT_DATA.expenses.forEach(e => { defMap[e.id] = e; });
 
-  // Dynamically load Firebase SDK (compat version — simpler API)
-  if (!window.firebase) {
-    await loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js');
-    await loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js');
+  S.expenses = S.expenses || [];
+
+  // For each saved expense, patch structural fields from default if type is wrong/missing
+  S.expenses = S.expenses.map(e => {
+    const def = defMap[e.id];
+    if (!def) return e; // user-added custom line — leave untouched
+
+    // Always restore structural fields from default
+    const patched = { ...def };
+
+    // Preserve user-entered values
+    if (e.spent   !== undefined) patched.spent    = e.spent;
+    if (e.notes   !== undefined) patched.notes    = e.notes;
+    if (e.expanded!== undefined) patched.expanded = e.expanded;
+
+    // For perunit lines: preserve user's unitPrice and qty if they set them
+    if (def.type === 'perunit') {
+      if (e.unitPrice && e.unitPrice !== def.unitPrice) patched.unitPrice = e.unitPrice;
+      if (e.qty       && e.qty       !== def.qty)       patched.qty       = e.qty;
+    }
+    // For fixed lines: preserve user's fixedAmt if they set it
+    if (def.type === 'fixed') {
+      if (e.fixedAmt && e.fixedAmt !== def.fixedAmt) patched.fixedAmt = e.fixedAmt;
+    }
+    // Preserve tip values if user changed them
+    if (def.tip && e.tip) {
+      patched.tip = { ...def.tip, ...e.tip };
+    }
+
+    return patched;
+  });
+
+  // Add any default expenses that are missing (new lines added in a future update)
+  DEFAULT_DATA.expenses.forEach(def => {
+    if (!S.expenses.find(e => e.id === def.id)) {
+      S.expenses.push(JSON.parse(JSON.stringify(def)));
+    }
+  });
+
+  // Ensure vendor comparison fields exist on price×qty tables
+  ['tshirts','hats','totes'].forEach(key => {
+    if (S[key]) {
+      S[key] = S[key].map(r => ({
+        desc: r.desc || r.label || r.style || r.size || '',
+        label: r.label || r.style || r.size || '',
+        size: r.size || r.label || '',
+        price: r.price || 0,
+        qty: r.qty || 0,
+        notes: r.notes || '',
+        ...(r.vendorId !== undefined ? {vendorId: r.vendorId} : {}),
+        ...r,
+      }));
+    }
+  });
+
+  // Legacy: if hats has 'selected' field (old format), migrate to vendorId
+  if (S.hats && S.hats.some(r => r.selected !== undefined && r.vendorId === undefined)) {
+    // old comparison mode — ignore, migration will reset
   }
 
-  if (!firebase.apps.length) {
-    firebase.initializeApp(FIREBASE_CONFIG);
+  // Ensure hats table has a 'selected' field for comparison mode
+  if (S.hats) {
+    S.hats = S.hats.map(r => ({
+      ...r,
+      compare: r.compare !== undefined ? r.compare : false,
+      selected: r.selected !== undefined ? r.selected : false,
+    }));
+    // If none selected, select the one with lowest price by default
+    if (!S.hats.some(r => r.selected)) {
+      const cheapest = S.hats.reduce((a,b) => (+a.price||0) <= (+b.price||0) ? a : b, S.hats[0]);
+      if (cheapest) cheapest.selected = true;
+    }
   }
-  _db = firebase.database();
-  return _db;
+
+  // nextId safety
+  if (!S.nextId) S.nextId = 300;
+
+  // Other tabs
+  if (!S.todos)     S.todos     = JSON.parse(JSON.stringify(DEFAULT_DATA.todos));
+  if (!S.inventory) S.inventory = JSON.parse(JSON.stringify(DEFAULT_DATA.inventory));
+  if (!S.authors)   S.authors   = JSON.parse(JSON.stringify(DEFAULT_DATA.authors));
+  if (!S.wishlist)  S.wishlist  = JSON.parse(JSON.stringify(DEFAULT_DATA.wishlist));
+  if (!S.admin)     S.admin     = JSON.parse(JSON.stringify(DEFAULT_DATA.admin));
+  if (!S.helpers)   S.helpers   = JSON.parse(JSON.stringify(DEFAULT_DATA.helpers));
+  if (!S.agenda)    S.agenda    = JSON.parse(JSON.stringify(DEFAULT_DATA.agenda));
+  if (!S.qAndA)     S.qAndA     = JSON.parse(JSON.stringify(DEFAULT_DATA.qAndA));
+  if (!S.seating)   S.seating   = JSON.parse(JSON.stringify(DEFAULT_DATA.seating));
 }
 
-function loadScript(src) {
-  return new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = src;
-    s.onload = resolve;
-    s.onerror = reject;
-    document.head.appendChild(s);
-  });
+function loadState() {
+  try {
+    const raw = localStorage.getItem(SK);
+    S = raw ? JSON.parse(raw) : JSON.parse(JSON.stringify(DEFAULT_DATA));
+  } catch(e) {
+    S = JSON.parse(JSON.stringify(DEFAULT_DATA));
+  }
+  migrateState();
 }
 
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
-
-/**
- * Read a value once from the database.
- * @param {string} path  e.g. 'prizes' or 'meta'
- * @returns {Promise<any>}
- */
-async function dbGet(path) {
-  const db = await initFirebase();
-  const snap = await db.ref(path).once('value');
-  return snap.val();
+function saveState() {
+  try { localStorage.setItem(SK, JSON.stringify(S)); } catch(e) { console.warn('Save failed', e); }
 }
 
-/**
- * Write a value to the database.
- * @param {string} path
- * @param {any} value
- */
-async function dbSet(path, value) {
-  const db = await initFirebase();
-  await db.ref(path).set(value);
+// ── UI helpers ────────────────────────────────────────────────────────────────
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
 }
 
-/**
- * Subscribe to real-time changes on a path.
- * Calls callback(value) whenever data changes.
- * Returns an unsubscribe function.
- * @param {string} path
- * @param {function} callback
- */
-async function dbListen(path, callback) {
-  const db = await initFirebase();
-  const ref = db.ref(path);
-  const handler = snap => callback(snap.val());
-  ref.on('value', handler);
-  return () => ref.off('value', handler);
+function showModal(html) {
+  const mc = document.getElementById('modal-container');
+  mc.innerHTML = `<div class="modal-overlay" id="modal-bg" onclick="closeModalOutside(event)">
+    <div class="modal">
+      <button class="modal-close" onclick="closeModal()" aria-label="Close"><i class="ti ti-x"></i></button>
+      ${html}
+    </div>
+  </div>`;
 }
+function closeModal() { document.getElementById('modal-container').innerHTML = ''; }
+function closeModalOutside(e) { if (e.target.id === 'modal-bg') closeModal(); }
 
-/**
- * Atomically increment a counter (used for nextId).
- * @param {string} path
- * @returns {Promise<number>}  the new value
- */
-async function dbIncrement(path) {
-  const db = await initFirebase();
-  const ref = db.ref(path);
-  let newVal;
-  await ref.transaction(current => {
-    newVal = (current || 0) + 1;
-    return newVal;
-  });
-  return newVal;
+function fmt(n) {
+  return '$' + (+(n||0)).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function pctStr(n, t) { return t > 0 ? Math.round(n/t*100) + '%' : '0%'; }
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }

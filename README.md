@@ -1,118 +1,48 @@
-# Bookish Summer Soirée — Prize Manager
+# Bookish Summer Soirée 2027 — Event HQ
 
-A Progressive Web App (PWA) for tracking prizes, donation tags, budgets, and authors for the Bookish Summer Soirée event. Supports multiple users with live sync.
+Nicole-only event management app. Tracks finances, to-do list, inventory/packing, people, and event day info.
 
----
+## Tabs
 
-## Setup (one-time, ~10 minutes)
+**Finances** — Ticket price calculator. Enter attendance numbers and it computes the per-ticket price live. Side-by-side estimated vs. actual expense tracking. T-shirt, hat, and tote size/qty tables. Misc budget tracker with purchase links.
 
-### 1. Create a Firebase project (free)
+**To-do** — Full task list with assignee, done/not done, search and filter by person or status. All 44 tasks from your 2027 spreadsheet are pre-loaded.
 
-1. Go to [https://console.firebase.google.com](https://console.firebase.google.com)
-2. Click **Add project** → name it `soiree-prizes` → Continue (no need for Google Analytics)
-3. In the left sidebar, click **Build → Realtime Database**
-4. Click **Create Database** → choose a location → start in **test mode** (you'll secure it after)
-5. Copy the database URL — it looks like `https://soiree-prizes-default-rtdb.firebaseio.com`
+**Inventory** — Packing checklist organized by location (Nicole's, Alyssa's, Other). Check off items as you pack. Progress bar shows overall status.
 
-### 2. Get your Firebase config
+**People** — Confirmed authors with status (confirmed / asked / maybe), admin team, helpers, and the future wish list with notes.
 
-1. In Firebase Console, click the gear icon ⚙️ → **Project settings**
-2. Scroll to **Your apps** → click the `</>` (Web) icon → register app (name it anything)
-3. Copy the `firebaseConfig` values
+**Event day** — Full agenda, Getting to Know You author game questions, and the book signing seating chart (2026 layout — update for 2027 as authors confirm).
 
-### 3. Add your config to the app
-
-Open `js/storage.js` and fill in your values:
-
-```js
-const FIREBASE_CONFIG = {
-  apiKey: "AIza...",
-  authDomain: "soiree-prizes.firebaseapp.com",
-  databaseURL: "https://soiree-prizes-default-rtdb.firebaseio.com",
-  projectId: "soiree-prizes",
-};
-```
-
-### 4. Secure your database (recommended)
-
-In Firebase Console → Realtime Database → **Rules**, paste:
-
-```json
-{
-  "rules": {
-    ".read": true,
-    ".write": true
-  }
-}
-```
-
-> This keeps it open (fine for a private event app). If you want to restrict access, you can add Firebase Authentication later.
-
-### 5. Deploy to GitHub Pages
+## Hosting (GitHub Pages)
 
 1. Push this folder to a GitHub repo
-2. Go to repo **Settings → Pages**
-3. Set source to **main branch, / (root)**
-4. Your app will be live at `https://YOUR-USERNAME.github.io/REPO-NAME`
+2. Settings → Pages → Source: main branch, / (root)
+3. Your app is live at `https://YOUR-USERNAME.github.io/REPO-NAME`
 
-### 6. Add to home screen
+## Install on home screen
 
-**iPhone:** Open the URL in Safari → tap the Share button → **Add to Home Screen**
+**iPhone:** Open in Safari → Share → Add to Home Screen
+**Android:** Open in Chrome → ⋮ menu → Add to Home Screen
 
-**Android:** Open in Chrome → tap the three-dot menu → **Add to Home Screen**
+## Data storage
 
----
+All data saves locally in your browser (localStorage). It is **not shared** — this is a single-user app for Nicole only. No Firebase or internet connection needed.
 
-## User accounts
+If you clear your browser cache, data resets. To back up: Settings → (future feature) Export JSON.
 
-Default accounts (set up in `js/auth.js`):
+## Updating for 2028
 
-| Username | Role | Default view |
-|----------|------|-------------|
-| `nicole` | Admin | All prizes |
-| `coordinator` | Coordinator | BINGO only |
+When planning the next year:
+1. Open the browser console (Safari: Develop → Show Web Inspector → Console)
+2. Type: `localStorage.removeItem('soiree_hq_2027')` and press Enter
+3. Reload the app — it will start fresh with the default template
+4. Or: just edit `js/data.js` directly with the new year's numbers before deploying
 
-Both accounts have **no password set** — each person sets their own password on first login.
+## This app vs. the Prize Manager
 
-**To add more users:** Sign in as Nicole (admin) → Settings → User accounts → Add user.
+These are two separate apps by design:
+- **Soirée HQ** (this app) — Nicole only. Finances, planning, operations.
+- **Soirée Prizes** (the other app) — Shared with your prize coordinator. Prize tracking only.
 
-**To reset someone's password:** Settings → User accounts → click the key icon next to their name.
-
----
-
-## File structure
-
-```
-soiree-prizes/
-├── index.html          # App entry point
-├── manifest.json       # PWA manifest
-├── sw.js               # Service worker (offline support)
-├── css/
-│   └── app.css         # All styles
-├── js/
-│   ├── storage.js      # Firebase database layer ← ADD YOUR CONFIG HERE
-│   ├── auth.js         # User accounts & passwords
-│   ├── state.js        # Shared data & sync
-│   ├── ui-goals.js     # Goals progress bar
-│   ├── ui-prizes.js    # Prize list, filters, add/edit
-│   ├── ui-tags.js      # Donation tag tracker
-│   ├── ui-budget.js    # Budget dashboard
-│   ├── ui-authors.js   # Authors tab
-│   ├── ui-settings.js  # Settings, users, reset
-│   └── app.js          # Main app, login, routing
-└── icons/
-    ├── icon-192.png    # PWA icon
-    └── icon-512.png    # PWA icon (large)
-```
-
----
-
-## For 2028 and beyond
-
-When you're ready to start fresh for a new year:
-1. Sign in as admin
-2. Go to **Settings → Reset all prize data** (deletes prizes only — keeps users)
-3. Update goals, budgets, and authors in Settings
-4. Change the event year in Settings → Event details
-
-Or duplicate the GitHub repo for a clean archive of each year.
+Both use the same Soirée logo icon on your home screen.
