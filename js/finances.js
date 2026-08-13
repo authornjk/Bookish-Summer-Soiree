@@ -231,8 +231,9 @@ function renderFinances() {
 }
 function expRow(e,i,paying) {
   // Skip inactive merch lines (only built-in hats/tshirts have expense rows)
-  const allMerch = S.merchOptions || ['hats','tshirts'];
-  if (e.type==='subtable' && allMerch.includes(e.subtable) && e.subtable !== (S.merchType||'hats')) return '';
+  const allMerchKeys = S.merchOptions || ['hats','tshirts'];
+  // Hide inactive merch options; show active one and all non-merch subtables
+  if (e.type==='subtable' && allMerchKeys.includes(e.subtable) && e.subtable !== (S.merchType||'hats')) return '';
 
   const est=lineEst(e), spent=lineSpent(e);
   const perTix=paying>0?Math.round(est/paying*100)/100:0;
@@ -627,7 +628,7 @@ function doAddMerchOption() {
       spent:0, notes:'', expanded:false
     });
   }
-  if (!S[key]) S[key] = [{label:'Standard',price:0,qty:0}];
+  if (!S[key]) S[key] = [{label:'',price:0,qty:0}];
   if (!S.merchLabels) S.merchLabels = {};
   S.merchLabels[key] = name;
   saveState(); closeModal(); renderFinances();
