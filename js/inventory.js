@@ -1,9 +1,37 @@
 // inventory.js — clean rewrite with categories as buttons, search, edit, strip prefix
 
-var _invCat    = '';
-var _invLoc    = '';
-var _invSearch = '';
-var _invSort   = 'item';
+var _invCat      = '';
+var _invLoc      = '';
+var _invSearch   = '';
+var _invSort     = 'item';
+var _invDebounce = null;
+
+function debounceRenderInv(val) {
+  _invSearch = val;
+  clearTimeout(_invDebounce);
+  _invDebounce = setTimeout(() => {
+    renderInvList();
+  }, 150);
+}
+
+function renderInvList() {
+  const listEl = document.getElementById('inv-list');
+  if (!listEl) { renderInventory(); return; }
+  const cats = getInvCategories();
+  let items = (S.inventory||[]).map(i => ({...i, displayItem: stripPrefix(i.item)}));
+  if (_invSearch.trim()) {
+    const q = _invSearch.toLowerCase();
+    const primary   = items.filter(i => i.displayItem.toLowerCase().includes(q));
+    const secondary = items.filter(i => !i.displayItem.toLowerCase().includes(q) && (i.note||'').toLowerCase().includes(q));
+    items = [...primary, ...secondary];
+  }
+  if (_invCat) items = items.filter(i => (i.cat||'Misc') === _invCat);
+  if (_invLoc) items = items.filter(i => i.loc === _invLoc);
+  if (_invSort === 'item') items = [...items].sort((a,b) => a.displayItem.localeCompare(b.displayItem));
+  if (_invSort === 'cat')  items = [...items].sort((a,b) => ((a.cat||'Misc').localeCompare(b.cat||'Misc')) || a.displayItem.localeCompare(b.displayItem));
+  listEl.innerHTML = items.map(item => invRow(item)).join('') ||
+    '<div style="color:var(--text3);font-size:13px;text-align:center;padding:2rem">No items found.</div>';
+}
 
 function getInvCategories() {
   return S.inventoryCategories || ['Backdrops','Check-in','Decor','Misc','Prize table'];
@@ -57,7 +85,7 @@ function renderInventory() {
     <div style="margin-bottom:8px">
       <input type="text" id="inv-search" value="${escHtml(_invSearch)}" placeholder="Search items and notes…"
         style="width:100%;font-size:13px;padding:8px 12px"
-        oninput="_invSearch=this.value;renderInventory()">
+        oninput="debounceRenderInv(this.value)">
     </div>
 
     <!-- Category filter buttons -->
@@ -79,10 +107,8 @@ function renderInventory() {
     </div>
 
     <!-- Items -->
-    <div style="display:flex;flex-direction:column;gap:4px">
-      ${items.map(item => invRow(item)).join('')}
-      ${items.length===0?`<div style="color:var(--text3);font-size:13px;text-align:center;padding:2rem">No items found.</div>`:''}
-    </div>`;
+    <div id="inv-list" style="display:flex;flex-direction:column;gap:4px"></div>`;
+  setTimeout(renderInvList, 0);
 }
 
 function invRow(item) {
