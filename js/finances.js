@@ -55,6 +55,13 @@ function numIn(id, val, onblurFn, style) {
     class="ni num-in" style="${style||''}"
     onblur="${onblurFn}" onkeydown="if(event.key==='Enter')this.blur()">`;
 }
+function parseMoney(val) {
+  // Only interpret as cents-included if user typed a decimal
+  const s = String(val||'').trim().replace(/[^0-9.]/g,'');
+  if (!s) return 0;
+  if (s.includes('.')) return Math.round(parseFloat(s)*100)/100;
+  return parseInt(s, 10); // no decimal = whole dollars
+}
 function moneyIn(id, val, onblurFn, style) {
   const v = val!=null && val!=='' ? (+val).toFixed(2) : '';
   return `<input type="text" inputmode="decimal" id="${id}" value="${v}"
@@ -173,7 +180,7 @@ function blurAtt(field, val) {
 }
 
 function blurTicket(val) {
-  S.ticketPrice = Math.round(parseFloat(val)||0*100)/100;
+  S.ticketPrice = Math.round(parseMoney(val)*100)/100;
   saveState(); renderFinances();
 }
 
@@ -242,7 +249,7 @@ function expRow(e, i, paying) {
 
 function blurExpField(i, field, val, type) {
   if (!S.expenses[i]) return;
-  S.expenses[i][field] = type==='money' ? (Math.round(parseFloat(val)||0*100)/100) : val;
+  S.expenses[i][field] = type==='money' ? (Math.round(parseMoney(val)*100)/100) : val;
   saveState(); renderFinances();
 }
 
@@ -330,15 +337,25 @@ function openEditExpense(i) {
     <h3>Edit: ${escHtml(e.label)}</h3>
     <div class="field"><label>Name</label><input type="text" id="ee-name" value="${escHtml(e.label)}"></div>
     ${isCC?`<div class="field"><label>CC fee %</label><input type="text" inputmode="decimal" id="ee-cc" value="${e.ccPct||S.ccFeePercent||3.2}"></div>`:''}
-    ${e.type==='fixed'?`<div class="field"><label>Amount ($)</label><input type="text" inputmode="decimal" id="ee-fixed" value="${(+(e.fixedAmt||0)).toFixed(2)}"></div>`:''}
+    ${e.type==='fixed'?`
+      <div class="field"><label>Amount ($)</label><input type="text" inputmode="decimal" id="ee-fixed" value="${(+(e.fixedAmt||0)).toFixed(2)}"></div>
+      <div class="field"><label>Quantity based on</label>
+        <select id="ee-based-fixed">
+          <option value="none"${(e.unitLabelType||'none')==='none'?' selected':''}>Set amount (no qty)</option>
+          <option value="total"${e.unitLabelType==='total'?' selected':''}>Total attendees (${S.attendance.total})</option>
+          <option value="authors"${e.unitLabelType==='authors'?' selected':''}>Authors only (${S.attendance.authors})</option>
+        </select>
+      </div>`:''}
     ${isPer?`
       <div class="field"><label>Price per item ($)</label><input type="text" inputmode="decimal" id="ee-unit" value="${(+(e.unitPrice||0)).toFixed(2)}"></div>
       <div class="field"><label>Based on</label>
         <select id="ee-based">
-          <option value="total"${e.unitLabelType!=='authors'?' selected':''}>Total attendees</option>
-          <option value="authors"${e.unitLabelType==='authors'?' selected':''}>Authors only</option>
+          <option value="total"${(e.unitLabelType||'total')==='total'?' selected':''}>Total attendees (${S.attendance.total})</option>
+          <option value="authors"${e.unitLabelType==='authors'?' selected':''}>Authors only (${S.attendance.authors})</option>
+          <option value="set"${e.unitLabelType==='set'?' selected':''}>Set amount</option>
         </select>
-      </div>`:''}
+      </div>
+      ${(e.unitLabelType||'total')==='set'?`<div class="field"><label>Quantity</label><input type="number" id="ee-qty" value="${e.qty||0}"></div>`:''}`:''}
     ${isSub?`<div style="font-size:12px;color:var(--text2);padding:8px 0">This line pulls from the <strong>${escHtml(e.subtable)}</strong> section below.</div>`:''}
     ${e.tip&&e.tip.enabled?`
       <div class="field"><label>Tip type</label>
@@ -361,12 +378,26 @@ function doEditExpense(i) {
   e.notes = document.getElementById('ee-notes')?.value?.trim() || '';
   if (e.type==='fixed')   e.fixedAmt  = parseFloat(document.getElementById('ee-fixed')?.value)||0;
   if (e.type==='cc_fee')  e.ccPct     = parseFloat(document.getElementById('ee-cc')?.value)||3.2;
+  if (e.type==='fixed') {
+    const basedFixed = document.getElementById('ee-based-fixed')?.value||'none';
+    if (basedFixed !== 'none') {
+      e.unitLabelType = basedFixed;
+      e.qty = basedFixed==='authors' ? S.attendance.authors : S.attendance.total;
+    } else {
+      e.unitLabelType = 'none';
+    }
+  }
   if (e.type==='perunit') {
-    e.unitPrice = parseFloat(document.getElementById('ee-unit')?.value)||0;
+    e.unitPrice = parseMoney(document.getElementById('ee-unit')?.value);
     const based = document.getElementById('ee-based')?.value||'total';
     e.unitLabelType = based;
-    e.unitLabel = based==='authors'?'per author':'per person';
-    e.qty = based==='authors' ? S.attendance.authors : S.attendance.total;
+    if (based==='set') {
+      e.qty = parseInt(document.getElementById('ee-qty')?.value)||0;
+      e.unitLabel = 'items';
+    } else {
+      e.unitLabel = based==='authors'?'per author':'per person';
+      e.qty = based==='authors' ? S.attendance.authors : S.attendance.total;
+    }
   }
   if (e.tip && e.tip.enabled) {
     e.tip.type = document.getElementById('ee-tiptype')?.value || e.tip.type;
@@ -401,7 +432,7 @@ function renderMerchSection() {
             <input class="st-name-input" type="text" value="${escHtml(r.label||'')}" placeholder="Size/style"
               onblur="stSaveField('${key}',${i},'label',this.value)"
               onkeydown="if(event.key==='Enter')this.blur()">
-            ${moneyIn('stp'+key+i, r.price, `stSaveField('${key}',${i},'price',parseFloat(this.value)||0)`, 'width:70px;font-size:12px')}
+            ${moneyIn('stp'+key+i, r.price, `stSaveField('${key}',${i},'price',parseMoney(this.value))`, 'width:70px;font-size:12px')}
             ${numIn('stq'+key+i, r.qty, `stSaveField('${key}',${i},'qty',parseInt(this.value)||0)`, 'width:52px;font-size:12px;text-align:right')}
             <span style="font-size:12px;font-weight:600;min-width:60px;text-align:right">${fmt((+r.price||0)*(+r.qty||0))}</span>
             <button class="icon-btn del-btn" onclick="confirmDelete('Delete this item?',()=>{S.${key}.splice(${i},1);saveState();renderFinances()})" title="Delete">
@@ -523,11 +554,11 @@ function stEstSpent(key, title) {
         <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
           <div style="text-align:right">
             <div style="font-size:10px;color:var(--text3)">Est</div>
-            ${moneyIn('se'+key+i+'e', r.est, `stSaveField('${key}',${i},'est',parseFloat(this.value)||0)`, 'width:70px;font-size:12px')}
+            ${moneyIn('se'+key+i+'e', r.est, `stSaveField('${key}',${i},'est',parseMoney(this.value))`, 'width:70px;font-size:12px')}
           </div>
           <div style="text-align:right">
             <div style="font-size:10px;color:var(--text3)">Spent</div>
-            ${moneyIn('se'+key+i+'s', r.spent, `stSaveField('${key}',${i},'spent',parseFloat(this.value)||0)`, 'width:70px;font-size:12px')}
+            ${moneyIn('se'+key+i+'s', r.spent, `stSaveField('${key}',${i},'spent',parseMoney(this.value))`, 'width:70px;font-size:12px')}
           </div>
           ${diff!==null?`<div style="font-size:10px;color:${diff>0?'var(--red)':'var(--green)'};min-width:40px;text-align:right">${diff>0?'+':''}${fmt(diff)}</div>`:'<div style="min-width:40px"></div>'}
           <button class="icon-btn" onclick="openEditStRow('${key}',${i})" title="Edit"><i class="ti ti-pencil" style="font-size:13px"></i></button>
@@ -624,7 +655,7 @@ function stPriceQty(key, title) {
       <input class="st-name-input" type="text" value="${escHtml(r.label||'')}" placeholder="Style"
         onblur="stSaveField('${key}',${i},'label',this.value)"
         onkeydown="if(event.key==='Enter')this.blur()">
-      ${moneyIn('stp'+key+i, r.price, `stSaveField('${key}',${i},'price',parseFloat(this.value)||0)`, 'width:100%;font-size:12px')}
+      ${moneyIn('stp'+key+i, r.price, `stSaveField('${key}',${i},'price',parseMoney(this.value))`, 'width:100%;font-size:12px')}
       ${numIn('stq'+key+i, r.qty, `stSaveField('${key}',${i},'qty',parseInt(this.value)||0)`, 'width:100%;font-size:12px;text-align:right')}
       <span style="font-size:12px;font-weight:600;text-align:right">${fmt((+r.price||0)*(+r.qty||0))}</span>
       <button class="icon-btn del-btn" onclick="confirmDelete('Delete this row?',()=>deleteStRow('${key}',${i}))" title="Delete">
@@ -651,6 +682,11 @@ function stPriceQty(key, title) {
     ${rows.length===0?`<div style="color:var(--text3);font-size:12px;padding:8px 0">No rows yet. Tap + to add.</div>`:''}
     <div style="display:flex;justify-content:space-between;padding:6px 0;font-weight:600;font-size:12px">
       <span>Total</span><span>${fmt(total)}</span>
+    </div>
+    <div style="text-align:center;padding:14px 0 4px">
+      <button class="btn" style="font-size:11px" onclick="document.querySelector('.shell').scrollTo({top:0,behavior:'smooth'})">
+        <i class="ti ti-arrow-up"></i> Return to top
+      </button>
     </div>
   </div>`;
 }
