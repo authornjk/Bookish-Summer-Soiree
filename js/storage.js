@@ -1,3 +1,6 @@
+// Global swipe state shared across tabs
+var _authorSwipeX = 0;
+
 // storage.js — HQ state management + Firebase sync
 const SK = 'soiree_hq_2027';
 let S = {};

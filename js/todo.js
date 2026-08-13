@@ -59,7 +59,7 @@ function renderTodo() {
 
 function todoRowHTML(t) {
   const isOpen = _swipedTodoId === t.id;
-  return `<div class="author-swipe-row${isOpen?' open':''}" id="todo-row-${t.id}">
+  return `<div class="author-swipe-row${isOpen?' open':''}" data-single="1" id="todo-row-${t.id}">
     <div class="author-swipe-content"
       ontouchstart="_authorSwipeX=event.touches[0].clientX"
       ontouchend="todoSwipeEnd(event,${t.id})">
@@ -73,7 +73,7 @@ function todoRowHTML(t) {
         </div>
       </div>
     </div>
-    <div class="author-swipe-actions" style="width:80px">
+    <div class="author-swipe-actions" data-w="80">
       <button class="author-action" style="background:var(--red)" onclick="deleteTodo(${t.id})">
         <i class="ti ti-trash"></i><span>Delete</span>
       </button>

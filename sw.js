@@ -1,5 +1,5 @@
-// v20260812.2 — bump to bust cache
-const CACHE='soiree-hq-v20260812.2';
+// v20260812.4 — bump to bust cache
+const CACHE='soiree-hq-v20260812.4';
 const ASSETS=['./','./index.html','./manifest.json','./css/app.css',
   './js/data.js','./js/storage.js','./js/finances.js','./js/todo.js',
   './js/inventory.js','./js/authors_hq.js','./js/eventday.js','./js/app.js',

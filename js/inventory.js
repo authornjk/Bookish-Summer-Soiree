@@ -74,7 +74,7 @@ function renderInventory() {
 function invRowHTML(item) {
   const isOpen = _swipedInvId === item.id;
   const cat = item.cat||'Misc';
-  return `<div class="author-swipe-row${isOpen?' open':''}" id="inv-row-${item.id}">
+  return `<div class="author-swipe-row${isOpen?' open':''}" data-single="1" id="inv-row-${item.id}">
     <div class="author-swipe-content"
       ontouchstart="_authorSwipeX=event.touches[0].clientX"
       ontouchend="invSwipeEnd(event,${item.id})">
@@ -91,7 +91,7 @@ function invRowHTML(item) {
         </div>
       </div>
     </div>
-    <div class="author-swipe-actions" style="width:80px">
+    <div class="author-swipe-actions" data-w="80">
       <button class="author-action" style="background:var(--red)" onclick="deleteInvItem(${item.id})">
         <i class="ti ti-trash"></i><span>Delete</span>
       </button>

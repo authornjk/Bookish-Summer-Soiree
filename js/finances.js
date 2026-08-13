@@ -1,7 +1,7 @@
-// Shared swipe state
-if(typeof _authorSwipeX === "undefined") var _authorSwipeX = 0;
-let _swipedExpIdx = null;
-let _expSwipeX = 0;
+// Shared swipe state — must be var so they're global across all JS files
+var _authorSwipeX = _authorSwipeX || 0;
+var _swipedExpIdx = null;
+var _expSwipeX = 0;
 
 // finances.js — full expense calculator with merch toggle and swipe-to-delete
 
