@@ -1,581 +1,447 @@
-// Shared swipe state — must be var so they're global across all JS files
-var _authorSwipeX = _authorSwipeX || 0;
-var _swipedExpIdx = null;
-var _expSwipeX = 0;
+// finances.js — clean rewrite
 
-// finances.js — full expense calculator with merch toggle and swipe-to-delete
+var _swipedExpIdx = null;
+var _expSwipeX    = 0;
+var _stSwipedKey  = null;
+var _stSwipedIdx  = null;
+
+// ── Calculations ──────────────────────────────────────────────────────────────
 
 function tipAmt(tip, base) {
-  if (!tip||!tip.enabled) return 0;
-  if (tip.type==='pct') return Math.round((tip.pct||0)/100*base*100)/100;
-  return +(tip.fixedAmt||0);
+  if (!tip || !tip.enabled) return 0;
+  return tip.type === 'pct' ? Math.round((tip.pct||0)/100*base*100)/100 : +(tip.fixedAmt||0);
 }
 
-function subtableEst(name) {
-  const rows = S[name]||[];
-  if (['tshirts','hats','totes'].includes(name))
-    return rows.reduce((s,r)=>s+Math.round((+r.price||0)*(+r.qty||0)*100)/100,0);
-  return rows.reduce((s,r)=>s+(+r.est||0),0);
-}
-
-function subtableSpent(name) {
-  if (['tshirts','hats','totes'].includes(name)) return 0;
-  return (S[name]||[]).reduce((s,r)=>s+(+r.spent||0),0);
+function subtableTotal(name) {
+  const rows = S[name] || [];
+  if (['tshirts','hats','totes'].includes(name) || (S.merchOptions||[]).includes(name)) {
+    return rows.reduce((s,r) => s + Math.round((+r.price||0)*(+r.qty||0)*100)/100, 0);
+  }
+  return rows.reduce((s,r) => s + (+r.est||0), 0);
 }
 
 function lineEst(e) {
-  if (e.type==='subtable') {
-    // Skip inactive merch options
+  if (e.type === 'cc_fee') {
+    const pct = +(e.ccPct || S.ccFeePercent || 3.2);
+    const paying = Math.max(0, S.attendance.total - S.attendance.authors - S.attendance.admin);
+    return Math.round(pct/100 * (+(S.ticketPrice||0)) * paying * 100) / 100;
+  }
+  if (e.type === 'fixed')   { const b = +(e.fixedAmt||0); return Math.round((b + tipAmt(e.tip,b))*100)/100; }
+  if (e.type === 'perunit') { const b = Math.round((+(e.unitPrice||0))*(+(e.qty||0))*100)/100; return Math.round((b + tipAmt(e.tip,b))*100)/100; }
+  if (e.type === 'subtable') {
+    // Skip inactive merch
     const allMerch = S.merchOptions || ['hats','tshirts'];
     if (allMerch.includes(e.subtable) && e.subtable !== (S.merchType||'hats')) return 0;
+    return subtableTotal(e.subtable);
   }
-  let base=0;
-  if (e.type==='fixed')    base=+(e.fixedAmt||0);
-  if (e.type==='perunit')  base=Math.round((+(e.unitPrice||0))*(+(e.qty||0))*100)/100;
-  if (e.type==='subtable') base=subtableEst(e.subtable);
-  return Math.round((base+tipAmt(e.tip,base))*100)/100;
-}
-
-function lineSpent(e) {
-  if (e.type==='subtable') return subtableSpent(e.subtable);
-  return +(e.spent||0);
+  return 0;
 }
 
 function calcTotals() {
-  const {total,authors,admin}=S.attendance;
-  const paying=Math.max(0,total-authors-admin);
-  const totalEst=Math.round(S.expenses.reduce((s,e)=>s+lineEst(e),0)*100)/100;
-  const totalSpent=Math.round(S.expenses.reduce((s,e)=>s+lineSpent(e),0)*100)/100;
-  const autoTicket=paying>0?Math.round(totalEst/paying*100)/100:0;
-  return {paying,totalEst,totalSpent,autoTicket};
+  const {total, authors, admin} = S.attendance;
+  const paying = Math.max(0, total - authors - admin);
+  const totalEst   = Math.round(S.expenses.reduce((s,e) => s + lineEst(e), 0)*100)/100;
+  const totalSpent = Math.round(S.expenses.reduce((s,e) => s + (+e.spent||0), 0)*100)/100;
+  const autoTicket = paying > 0 ? Math.round(totalEst/paying*100)/100 : 0;
+  const revenue    = Math.round((+(S.ticketPrice||0)) * paying * 100) / 100;
+  const surplus    = Math.round((revenue - totalEst)*100)/100;
+  return {paying, totalEst, totalSpent, autoTicket, revenue, surplus};
 }
 
-function moneyInExp(id,val,i,field,style) {
-  const v=val!=null&&val!==''?(+val).toFixed(2):'';
-  return `<input type="text" inputmode="decimal" id="${id}" class="ni money-in" value="${v}" placeholder="0.00" style="${style||''}"
-    onblur="blurMoneyExp(this,${i},'${field}')" onkeydown="if(event.key==='Enter')this.blur()">`;
+// ── Input helpers ─────────────────────────────────────────────────────────────
+
+function numIn(id, val, onblurFn, style) {
+  return `<input type="text" inputmode="numeric" id="${id}" value="${val??''}"
+    class="ni num-in" style="${style||''}"
+    onblur="${onblurFn}" onkeydown="if(event.key==='Enter')this.blur()">`;
 }
-function numInExp(id,val,i,field,style) {
-  return `<input type="text" inputmode="numeric" id="${id}" class="ni num-in" value="${val!=null?val:''}" placeholder="0" style="${style||''}"
-    onblur="blurNumExp(this,${i},'${field}')" onkeydown="if(event.key==='Enter')this.blur()">`;
-}
-function moneyInSt(id,val,key,i,field,style) {
-  const v=val!=null&&val!==''?(+val).toFixed(2):'';
-  return `<input type="text" inputmode="decimal" id="${id}" class="ni money-in" value="${v}" placeholder="0.00" style="${style||''}"
-    onblur="blurMoneySt(this,'${key}',${i},'${field}')" onkeydown="if(event.key==='Enter')this.blur()">`;
-}
-function numInSt(id,val,key,i,field,style) {
-  return `<input type="text" inputmode="numeric" id="${id}" class="ni num-in" value="${val!=null?val:''}" placeholder="0" style="${style||''}"
-    onblur="blurNumSt(this,'${key}',${i},'${field}')" onkeydown="if(event.key==='Enter')this.blur()">`;
+function moneyIn(id, val, onblurFn, style) {
+  const v = val!=null && val!=='' ? (+val).toFixed(2) : '';
+  return `<input type="text" inputmode="decimal" id="${id}" value="${v}"
+    class="ni money-in" placeholder="0.00" style="${style||''}"
+    onblur="${onblurFn}" onkeydown="if(event.key==='Enter')this.blur()">`;
 }
 
-function blurMoneyExp(el,i,field) {
-  const n=Math.round(parseFloat(el.value.replace(/[^0-9.\-]/g,'')||0)*100)/100;
-  el.value=isNaN(n)?'0.00':n.toFixed(2);
-  if(field==='_ticketPrice'){S.ticketPrice=isNaN(n)?0:n;}
-  else if(field==='_att_total'){S.attendance.total=Math.round(n)||0;}
-  else if(i>=0&&S.expenses[i]){S.expenses[i][field]=isNaN(n)?0:n;}
-  saveState();renderFinances();
-}
-function blurNumExp(el,i,field) {
-  const n=parseInt(el.value.replace(/[^0-9]/g,''),10)||0;
-  el.value=n;
-  if(field==='_att_total')   S.attendance.total=n;
-  else if(field==='_att_authors') S.attendance.authors=n;
-  else if(field==='_att_admin')   S.attendance.admin=n;
-  else if(field==='_tip_pct'&&i>=0&&S.expenses[i]?.tip) S.expenses[i].tip.pct=n;
-  else if(i>=0&&S.expenses[i]) S.expenses[i][field]=n;
-  saveState();renderFinances();
-}
-function blurMoneyTip(el,i,field) {
-  const n=Math.round(parseFloat(el.value.replace(/[^0-9.\-]/g,'')||0)*100)/100;
-  el.value=isNaN(n)?'0.00':n.toFixed(2);
-  if(S.expenses[i]?.tip) S.expenses[i].tip[field]=isNaN(n)?0:n;
-  saveState();renderFinances();
-}
-function blurMoneySt(el,key,i,field) {
-  const n=Math.round(parseFloat(el.value.replace(/[^0-9.\-]/g,'')||0)*100)/100;
-  el.value=isNaN(n)?'0.00':n.toFixed(2);
-  if(S[key]&&S[key][i]) S[key][i][field]=isNaN(n)?0:n;
-  saveState();renderFinances();
-}
-function blurNumSt(el,key,i,field) {
-  const n=parseInt(el.value.replace(/[^0-9]/g,''),10)||0;
-  el.value=n;
-  if(S[key]&&S[key][i]) S[key][i][field]=n;
-  saveState();renderFinances();
-}
+// ── Main render ───────────────────────────────────────────────────────────────
 
 function renderFinances() {
-  const el=document.getElementById('tab-finances');
-  if(!el) return;
-  // Safe defaults in case S is partially broken
-  if(!S.attendance) S.attendance={total:175,authors:18,admin:4};
-  if(!S.expenses) S.expenses=[];
-  if(S.ticketPrice===undefined) S.ticketPrice=0;
-  if(S.merchType===undefined) S.merchType='hats';
-  const {paying,totalEst,totalSpent,autoTicket}=calcTotals();
-  const {total,authors,admin}=S.attendance;
-  const setTicket=+(S.ticketPrice||0);
-  const useTicket=setTicket>0?setTicket:autoTicket;
-  const revenue=Math.round(useTicket*paying*100)/100;
-  const surplus=Math.round((revenue-totalEst)*100)/100;
-  const spentDiff=totalSpent>0?Math.round((totalSpent-totalEst)*100)/100:null;
+  const el = document.getElementById('tab-finances');
+  if (!el) return;
 
-  el.innerHTML=`
+  if (!S.attendance) S.attendance = {total:175,authors:18,admin:4};
+  S.attendance.admin = getAdminCount();
+  if (!S.expenses) S.expenses = [];
+  if (S.ticketPrice === undefined) S.ticketPrice = 0;
+  if (S.ccFeePercent === undefined) S.ccFeePercent = 3.2;
+
+  const {paying, totalEst, totalSpent, autoTicket, revenue, surplus} = calcTotals();
+  const {total, authors, admin} = S.attendance;
+  const spentDiff = totalSpent > 0 ? Math.round((totalSpent - totalEst)*100)/100 : null;
+
+  el.innerHTML = `
+  <!-- ATTENDANCE -->
   <div class="card">
     <div class="card-title">Attendance &amp; ticket price</div>
-    <!-- Row 1: inputs -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px">
+    <div class="att-row">
       <div class="att-cell">
-        <div class="att-lbl">Attendees</div>
-        ${numInExp('att-total',total,-1,'_att_total','width:100%;font-size:16px;font-weight:700;text-align:center')}
+        <div class="att-lbl">Total attendees</div>
+        ${numIn('att-total', total, 'blurAtt("total",this.value)', 'width:100%;font-size:18px;font-weight:700;text-align:center')}
       </div>
       <div class="att-cell">
-        <div class="att-lbl">Authors</div>
-        ${numInExp('att-authors',authors,-1,'_att_authors','width:100%;font-size:16px;font-weight:700;text-align:center')}
+        <div class="att-lbl">Authors (free)</div>
+        ${numIn('att-authors', authors, 'blurAtt("authors",this.value)', 'width:100%;font-size:18px;font-weight:700;text-align:center')}
       </div>
       <div class="att-cell">
-        <div class="att-lbl">Admin</div>
-        ${numInExp('att-admin',admin,-1,'_att_admin','width:100%;font-size:16px;font-weight:700;text-align:center')}
-      </div>
-      <div class="att-cell" style="border:.5px solid var(--purple);background:var(--purple-bg)">
-        <div class="att-lbl" style="color:var(--purple)">Paying</div>
-        <div style="font-size:18px;font-weight:700;color:var(--purple-text);text-align:center">${paying}</div>
+        <div class="att-lbl">Admin (free) <span style="font-size:9px;color:var(--text3)">(from Settings)</span></div>
+        <div style="font-size:18px;font-weight:700;text-align:center;padding:5px 0">${admin}</div>
       </div>
     </div>
-    <!-- Row 2: ticket price + stats -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-      <div class="att-cell" style="border:.5px solid var(--purple);background:var(--purple-bg)">
-        <div class="att-lbl" style="color:var(--purple)">Your ticket price</div>
-        ${moneyInExp('ticket-set',S.ticketPrice||'',-1,'_ticketPrice','width:100%;font-size:16px;font-weight:700;text-align:center;color:var(--purple-text)')}
-        <div class="att-sub" style="color:var(--purple)">Auto: ${fmt(autoTicket)}</div>
+    <div class="att-row" style="margin-top:6px">
+      <div class="att-cell" style="background:var(--purple-bg);border:.5px solid var(--purple)">
+        <div class="att-lbl" style="color:var(--purple)">Paying tickets</div>
+        <div style="font-size:20px;font-weight:700;color:var(--purple-text);text-align:center">${paying}</div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-        <div class="att-cell" style="background:${surplus>=0?'var(--green-bg)':'var(--red-bg)'}">
-          <div class="att-lbl" style="color:${surplus>=0?'var(--green-text)':'var(--red-dark)'}">
-            ${surplus>=0?'Surplus':'Shortfall'}
-          </div>
-          <div style="font-size:14px;font-weight:700;color:${surplus>=0?'var(--green)':'var(--red)'}">
-            ${surplus>=0?'+':''}${fmt(surplus)}
-          </div>
-        </div>
-        <div class="att-cell">
-          <div class="att-lbl">Spent</div>
-          <div style="font-size:14px;font-weight:700">${fmt(totalSpent)}</div>
-          <div class="att-sub" style="color:${spentDiff===null?'var(--text3)':spentDiff>0?'var(--red)':'var(--green)'}">
-            ${spentDiff===null?'':spentDiff>0?'+'+fmt(spentDiff):fmt(Math.abs(spentDiff))+' under'}
-          </div>
+      <div class="att-cell" style="background:var(--purple-bg);border:.5px solid var(--purple)">
+        <div class="att-lbl" style="color:var(--purple)">Ticket price</div>
+        ${moneyIn('ticket-price', S.ticketPrice||'', 'blurTicket(this.value)', 'width:100%;font-size:18px;font-weight:700;text-align:center;color:var(--purple-text)')}
+      </div>
+      <div class="att-cell">
+        <div class="att-lbl">Auto-calculated</div>
+        <div style="font-size:16px;font-weight:700">${fmt(autoTicket)}</div>
+        <div style="font-size:10px;color:var(--text3)">costs ÷ ${paying} tickets</div>
+      </div>
+    </div>
+    <div class="att-row" style="margin-top:6px">
+      <div class="att-cell" style="background:${surplus>=0?'var(--green-bg)':'var(--red-bg)'}">
+        <div class="att-lbl" style="color:${surplus>=0?'var(--green-text)':'var(--red-dark)'}">${surplus>=0?'Surplus':'Shortfall'}</div>
+        <div style="font-size:16px;font-weight:700;color:${surplus>=0?'var(--green)':'var(--red)'}">${surplus>=0?'+':''}${fmt(surplus)}</div>
+        <div style="font-size:10px;color:var(--text3)">revenue ${fmt(revenue)} − costs ${fmt(totalEst)}</div>
+      </div>
+      <div class="att-cell">
+        <div class="att-lbl">Spent so far</div>
+        <div style="font-size:16px;font-weight:700">${fmt(totalSpent)}</div>
+        <div style="font-size:10px;color:${spentDiff===null?'var(--text3)':spentDiff>0?'var(--red)':'var(--green)'}">
+          ${spentDiff===null?'No actuals yet':spentDiff>0?'+'+fmt(spentDiff)+' over':fmt(Math.abs(spentDiff))+' under'}
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Jump nav -->
-  <div class="jump-nav">
-    <span class="jump-lbl">Jump to:</span>
-    <button class="jump-link" onclick="scrollToSection('st-merch')">Merch</button>
-    <button class="jump-link" onclick="scrollToSection('st-prizes')">Prizes</button>
-    <button class="jump-link" onclick="scrollToSection('st-swag')">Swag</button>
-    <button class="jump-link" onclick="scrollToSection('st-decorations')">Decorations</button>
-    <button class="jump-link" onclick="scrollToSection('st-misc')">Misc</button>
-  </div>
-
-  <!-- Expense table -->
+  <!-- EXPENSES -->
   <div class="card">
-    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
-      Expenses
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div class="card-title" style="margin-bottom:0">Expenses</div>
       <button class="btn primary" style="font-size:11px;padding:4px 10px" onclick="openAddExpense()">
         <i class="ti ti-plus"></i> Add line
       </button>
     </div>
-    <div class="etbl">
-      <div class="erow ehdr">
-        <div class="ec-move"></div><div class="ec-label">Line item</div>
-        <div class="ec-type">Type</div><div class="ec-price">Unit price</div>
-        <div class="ec-qty">Qty</div><div class="ec-total">Total</div>
-        <div class="ec-pertix" style="color:var(--purple)">Per ticket</div>
-        <div class="ec-spent">Spent</div><div class="ec-diff">+/−</div>
-        <div class="ec-act"></div>
-      </div>
-      ${S.expenses.map((e,i)=>expRow(e,i,paying)).join('')}
-      <div class="erow etotals">
-        <div class="ec-move"></div>
-        <div class="ec-label" style="font-weight:600;grid-column:2/6">Totals</div>
-        <div class="ec-total" style="font-weight:700">${fmt(totalEst)}</div>
-        <div class="ec-pertix" style="font-weight:700;color:var(--purple)">${fmt(autoTicket)}</div>
-        <div class="ec-spent" style="font-weight:600;color:var(--text2)">${totalSpent>0?fmt(totalSpent):'—'}</div>
-        <div class="ec-diff" style="font-weight:600;color:${spentDiff===null?'var(--text3)':spentDiff>0?'var(--red)':'var(--green)'}">
-          ${spentDiff===null?'—':(spentDiff>0?'+':'')+fmt(spentDiff)}
-        </div>
-        <div class="ec-act"></div>
-      </div>
-      <!-- Mobile totals row -->
-      <div class="etotals">
-        <span style="font-weight:600">Total: ${fmt(totalEst)}</span>
-        <span style="color:var(--purple);font-weight:600">${fmt(autoTicket)}/ticket</span>
-        <span style="color:var(--text2)">Spent: ${totalSpent>0?fmt(totalSpent):'—'}</span>
-        ${spentDiff!==null?`<span style="color:${spentDiff>0?'var(--red)':'var(--green);font-weight:600'}">${spentDiff>0?'+':''} ${fmt(spentDiff)}</span>`:''}
-      </div>
+    <div id="expense-list">
+      ${S.expenses.map((e,i) => expRow(e,i,paying)).join('')}
+    </div>
+    <div class="exp-totals-row">
+      <span style="font-weight:600">Total</span>
+      <span style="font-weight:700">${fmt(totalEst)}</span>
+      <span style="color:var(--purple);font-weight:600">${fmt(autoTicket)}/ticket</span>
+      <span style="color:var(--text2)">Spent: ${fmt(totalSpent)}</span>
+      ${spentDiff!==null?`<span style="color:${spentDiff>0?'var(--red)':'var(--green)'}">${spentDiff>0?'+':''}${fmt(spentDiff)}</span>`:''}
     </div>
   </div>
 
-  <!-- Subtables -->
-  ${stMerch()}
-  ${stPriceQty('totes','Totes')}
-  ${stEstSpent('prizes','Prizes')}
-  ${stEstSpent('swag','Swag bag')}
+  <!-- SUBTABLES -->
+  ${renderMerchSection()}
   ${stEstSpent('decorations','Decorations')}
-  ${stEstSpent('misc','Misc expenses',true)}
+  ${stEstSpent('misc','Misc expenses')}
+  ${stEstSpent('prizes','Prizes (BINGO)')}
+  ${stEstSpent('swag','Swag bag')}
+  ${stPriceQty('totes','Tote bags')}
   `;
 }
-function expRow(e,i,paying) {
-  // Skip inactive merch lines (only built-in hats/tshirts have expense rows)
-  const allMerchKeys = S.merchOptions || ['hats','tshirts'];
-  // Hide inactive merch options; show active one and all non-merch subtables
-  if (e.type==='subtable' && allMerchKeys.includes(e.subtable) && e.subtable !== (S.merchType||'hats')) return '';
 
-  const est=lineEst(e), spent=lineSpent(e);
-  const perTix=paying>0?Math.round(est/paying*100)/100:0;
-  const diff=spent>0?Math.round((spent-est)*100)/100:null;
-  const diffHtml=diff===null?'<span style="color:var(--text3)">—</span>'
-    :diff>0?`<span class="over">+${fmt(diff)}</span>`:`<span class="under">${fmt(diff)}</span>`;
-  const isSub=e.type==='subtable';
-  const isOpen = _swipedExpIdx === i;
+// ── Attendance blur handlers ──────────────────────────────────────────────────
 
-  // Tip on same line as label
-  let tipHtml='';
-  if(e.tip&&e.tip.enabled){
-    const base=e.type==='fixed'?+(e.fixedAmt||0):(+(e.unitPrice||0))*(+(e.qty||0));
-    const ta=tipAmt(e.tip,base);
-    tipHtml=`<span class="exp-tip-badge">+ ${fmt(ta)} tip</span>`;
+function blurAtt(field, val) {
+  const n = parseInt(val)||0;
+  S.attendance[field] = n;
+  // Update per-unit quantities immediately
+  (S.expenses||[]).forEach(e => {
+    if (e.type === 'perunit') {
+      if (e.unitLabelType === 'total')   e.qty = S.attendance.total;
+      if (e.unitLabelType === 'authors') e.qty = S.attendance.authors;
+    }
+  });
+  saveState(); renderFinances();
+}
+
+function blurTicket(val) {
+  S.ticketPrice = Math.round(parseFloat(val)||0*100)/100;
+  saveState(); renderFinances();
+}
+
+// ── Expense row ───────────────────────────────────────────────────────────────
+
+function expRow(e, i, paying) {
+  // Skip inactive merch subtable lines
+  const allMerch = S.merchOptions || ['hats','tshirts'];
+  if (e.type === 'subtable' && allMerch.includes(e.subtable) && e.subtable !== (S.merchType||'hats')) return '';
+
+  const est    = lineEst(e);
+  const spent  = +(e.spent||0);
+  const perTix = paying > 0 ? Math.round(est/paying*100)/100 : 0;
+  const diff   = spent > 0 ? Math.round((spent-est)*100)/100 : null;
+  const isSub  = e.type === 'subtable';
+  const isCC   = e.type === 'cc_fee';
+
+  // Price cell
+  let priceCell = '';
+  if (e.type === 'fixed') {
+    priceCell = moneyIn('ef'+i, e.fixedAmt, `blurExpField(${i},'fixedAmt',this.value,'money')`, 'width:80px;font-size:12px');
+  } else if (e.type === 'perunit') {
+    priceCell = moneyIn('eu'+i, e.unitPrice, `blurExpField(${i},'unitPrice',this.value,'money')`, 'width:80px;font-size:12px')
+      + `<div style="font-size:9px;color:var(--text3);margin-top:1px">${escHtml(e.unitLabel||'')}</div>`;
+  } else if (e.type === 'cc_fee') {
+    priceCell = `<div style="display:flex;align-items:center;gap:2px">
+      ${moneyIn('ecc'+i, e.ccPct||S.ccFeePercent||3.2, `blurExpField(${i},'ccPct',this.value,'money')`, 'width:52px;font-size:12px')}
+      <span style="font-size:11px;color:var(--text3)">%</span>
+    </div>
+    <div style="font-size:9px;color:var(--text3);margin-top:1px">${fmt(est)}</div>`;
+  } else if (isSub) {
+    priceCell = `<button class="jump-btn" onclick="scrollToId('st-${e.subtable}')">↓ Go</button>`;
   }
 
-  // Sub-label: show price info compactly
-  let subLabel='';
-  if(e.type==='fixed')    subLabel=`${fmt(e.fixedAmt||0)} fixed`;
-  if(e.type==='perunit')  subLabel=`${fmt(e.unitPrice||0)} × ${e.qty||0}${e.unitLabel?' ('+e.unitLabel+')':''}`;
-  if(e.type==='subtable') subLabel=''; // no label needed — total speaks for itself
+  // Tip badge
+  let tipBadge = '';
+  if (e.tip && e.tip.enabled) {
+    const base = e.type==='fixed' ? +(e.fixedAmt||0) : Math.round((+(e.unitPrice||0))*(+(e.qty||0))*100)/100;
+    tipBadge = `<span class="tip-badge">+${fmt(tipAmt(e.tip,base))} tip</span>`;
+  }
 
-  const notesRow=e.expanded
-    ?`<div class="enotes-row"><textarea class="notes-area" placeholder="Notes…"
-        onblur="if(S.expenses[${i}])S.expenses[${i}].notes=this.value;saveState()">${escHtml(e.notes||'')}</textarea></div>`
-    :(e.notes?`<div class="enotes-preview">${escHtml(e.notes)}</div>`:'');
-
-  // Inline editable price/qty cells — tap to edit in place
-  const priceCell = e.type==='fixed'
-    ? moneyInExp('ef'+i, e.fixedAmt, i, 'fixedAmt', 'width:70px;font-size:11px;text-align:right')
-    : e.type==='perunit'
-    ? moneyInExp('eu'+i, e.unitPrice, i, 'unitPrice', 'width:70px;font-size:11px;text-align:right')
-    : `<a href="#st-${e.subtable}" style="font-size:10px;color:var(--purple);text-decoration:none;padding:2px 6px;border:0.5px solid var(--purple);border-radius:10px">↓ Go</a>`;
-
-  // qty hidden from row - auto-calculated from attendance or editable via Edit
-  const qtyCell = `<span style="font-size:10px;color:var(--text3)">${e.type==='perunit'?(e.unitLabel||''):''}</span>`;
-
-  return `<div class="exp-swipe-row${isOpen?' open':''}" id="exp-row-${i}">
-    <div class="exp-swipe-content"
-      ontouchstart="expSwipeStart(event,${i})"
-      ontouchend="expSwipeEnd(event,${i})">
-      <div class="exp-mobile-row${isSub?' sub-row':''}">
-        <div class="exp-mobile-reorder">
-          ${i>0?`<button class="icon-btn" onclick="moveExp(${i},-1)"><i class="ti ti-chevron-up" style="font-size:10px"></i></button>`:''}
-          ${i<S.expenses.length-1?`<button class="icon-btn" onclick="moveExp(${i},1)"><i class="ti ti-chevron-down" style="font-size:10px"></i></button>`:''}
-        </div>
-        <div class="exp-mobile-label">
-          <div style="font-size:13px;font-weight:500">${escHtml(e.label)}${tipHtml}</div>
-          ${e.notes?`<div class="enotes-preview" style="font-size:9px">${escHtml(e.notes)}</div>`:''}
-        </div>
-        <div class="exp-cell-price">${priceCell}</div>
-        <div class="exp-cell-qty">${qtyCell}</div>
-        <div class="exp-cell-total">
-          <div style="font-size:11px;color:var(--text)">${fmt(est)}</div>
-          <div style="font-size:9px;color:var(--purple)">${fmt(perTix)}/tix</div>
-        </div>
-        <div class="exp-cell-spent">
-          ${isSub
-            ?`<div style="font-size:11px;color:var(--text2)">${spent>0?fmt(spent):'—'}</div>`
-            :moneyInExp('es'+i,e.spent,i,'spent','width:68px;font-size:11px;text-align:right')}
-          ${diff!==null?`<div style="font-size:9px;margin-top:1px">${diffHtml}</div>`:''}
-        </div>
-      </div>
+  return `<div class="exp-row" id="exp-${i}">
+    <div class="exp-label">
+      <div style="font-size:13px;font-weight:500">${escHtml(e.label)}${tipBadge}</div>
+      ${e.notes?`<div style="font-size:10px;color:var(--text3)">${escHtml(e.notes)}</div>`:''}
     </div>
-    <div class="exp-swipe-actions">
-      <button class="exp-action-edit" onclick="openEditExpense(${i})"><i class="ti ti-pencil"></i><span>Edit</span></button>
-      <button class="exp-action-delete" onclick="deleteExp(${i})"><i class="ti ti-trash"></i><span>Delete</span></button>
+    <div class="exp-price">${priceCell}</div>
+    <div class="exp-est">
+      <div style="font-size:13px;font-weight:600">${fmt(est)}</div>
+      <div style="font-size:10px;color:var(--purple)">${fmt(perTix)}/tix</div>
     </div>
-    <!-- Always-visible action buttons for non-touch -->
-    <div class="exp-desktop-actions">
-      <button class="icon-btn" onclick="openEditExpense(${i})" title="Edit"><i class="ti ti-pencil"></i></button>
-      <button class="icon-btn del-btn" onclick="if(confirm('Delete this line?'))deleteExp(${i})" title="Delete"><i class="ti ti-trash"></i></button>
+    <div class="exp-spent">
+      ${isSub
+        ? `<div style="font-size:12px;color:var(--text2)">${spent>0?fmt(spent):'—'}</div>`
+        : moneyIn('es'+i, spent||'', `blurExpField(${i},'spent',this.value,'money')`, 'width:78px;font-size:12px')}
+      ${diff!==null?`<div style="font-size:10px;color:${diff>0?'var(--red)':'var(--green)'}">${diff>0?'+':''}${fmt(diff)}</div>`:''}
+    </div>
+    <div class="exp-actions">
+      <button class="icon-btn" onclick="openEditExpense(${i})" title="Edit"><i class="ti ti-pencil" style="font-size:14px"></i></button>
+      <button class="icon-btn del-btn" onclick="confirmDelete('Delete \\'${escHtml(e.label)}\\'?', ()=>deleteExp(${i}))" title="Delete"><i class="ti ti-trash" style="font-size:14px"></i></button>
     </div>
   </div>`;
 }
 
-function moveExp(i,dir){const j=i+dir;if(j<0||j>=S.expenses.length)return;[S.expenses[i],S.expenses[j]]=[S.expenses[j],S.expenses[i]];saveState();renderFinances();}
-function deleteExp(i){if(!confirm('Remove this line?'))return;S.expenses.splice(i,1);saveState();renderFinances();}
+// ── Expense field blur ────────────────────────────────────────────────────────
 
-function stPriceQty(key, title) {
-  const rows  = S[key] || [];
-  const total = rows.reduce((s,r) => s+Math.round((+r.price||0)*(+r.qty||0)*100)/100, 0);
-  const {paying} = calcTotals();
-  const perTix = paying > 0 ? Math.round(total/paying*100)/100 : 0;
-  const parent = S.expenses.find(e => e.type==='subtable' && e.subtable===key);
-
-  const rowsHtml = rows.map((r,i) => {
-    const isOpen = window._stSwipedKey===key && window._stSwipedIdx===i;
-    return `<div class="author-swipe-row${isOpen?' open':''}" data-single="1" style="margin-bottom:4px">
-      <div class="author-swipe-content"
-        ontouchstart="_authorSwipeX=event.touches[0].clientX"
-        ontouchend="stSwipeEnd(event,'${key}',${i})">
-        <div style="background:var(--bg);border:.5px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px">
-          <div style="display:grid;grid-template-columns:1fr 72px 52px 60px;gap:6px;align-items:center">
-            <div style="display:flex;align-items:center;gap:4px">
-              <input type="text" class="st-inline-name" value="${escHtml(r.label||r.size||'')}" placeholder="Size/style"
-                onblur="if(S.${key}&&S.${key}[${i}]){S.${key}[${i}].label=this.value;S.${key}[${i}].size=this.value;}saveState()"
-                onkeydown="if(event.key==='Enter')this.blur()">
-              <button class="icon-btn del-btn" onclick="if(confirm('Delete this item?'))delStRow('${key}',${i})" style="flex-shrink:0" title="Delete">
-                <i class="ti ti-trash"></i>
-              </button>
-            </div>
-            ${moneyInSt('st'+key+i+'p', r.price, key, i, 'price', 'width:100%;font-size:12px')}
-            ${numInSt('st'+key+i+'q', r.qty, key, i, 'qty', 'width:100%;font-size:12px;text-align:right')}
-            <span style="font-size:12px;font-weight:600;text-align:right">${fmt((+r.price||0)*(+r.qty||0))}</span>
-          </div>
-        </div>
-      </div>
-      <div class="author-swipe-actions" style="width:80px">
-        <button class="author-action" style="background:var(--red)" onclick="delStRow('${key}',${i})">
-          <i class="ti ti-trash"></i><span>Delete</span>
-        </button>
-      </div>
-    </div>`;
-  }).join('');
-
-  return `<div class="card" id="st-${key}">
-    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
-      <span>${title}</span>
-      <div style="display:flex;gap:6px;align-items:center">
-        <span style="font-size:10px;color:var(--text2)">${fmt(total)} · ${fmt(perTix)}/tix${parent?' → <em>'+escHtml(parent.label)+'</em>':''}</span>
-        <button class="icon-btn" onclick="addPQRow('${key}')"><i class="ti ti-plus"></i></button>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 72px 52px 60px;gap:4px;padding:0 2px;margin-bottom:4px">
-      <span style="font-size:10px;color:var(--text3);text-transform:uppercase">Size/style</span>
-      <span style="font-size:10px;color:var(--text3);text-align:right">Price</span>
-      <span style="font-size:10px;color:var(--text3);text-align:right">Qty</span>
-      <span style="font-size:10px;color:var(--text3);text-align:right">Total</span>
-    </div>
-    ${rowsHtml}
-    <div style="padding:4px 0;font-weight:600;font-size:12px;display:flex;justify-content:space-between">
-      <span>Total</span><span>${fmt(total)}</span>
-    </div>
-  </div>`;
+function blurExpField(i, field, val, type) {
+  if (!S.expenses[i]) return;
+  S.expenses[i][field] = type==='money' ? (Math.round(parseFloat(val)||0*100)/100) : val;
+  saveState(); renderFinances();
 }
 
-function stEstSpent(key, title) {
-  const rows = S[key] || [];
-  const totEst   = rows.reduce((s,r) => s+(+r.est||0), 0);
-  const totSpent = rows.reduce((s,r) => s+(+r.spent||0), 0);
-  const {paying} = calcTotals();
-  const perTix   = paying > 0 ? Math.round(totEst/paying*100)/100 : 0;
-  const parent   = S.expenses.find(e => e.type==='subtable' && e.subtable===key);
-
-  const rowsHtml = rows.map((r,i) => {
-    const diff = r.spent > 0 ? Math.round((r.spent - r.est)*100)/100 : null;
-    const dh   = diff===null ? '' : diff>0
-      ? `<span class="over">+${fmt(diff)}</span>`
-      : `<span class="under">${fmt(diff)}</span>`;
-    const isOpen = window._stSwipedKey===key && window._stSwipedIdx===i;
-    return `<div class="author-swipe-row${isOpen?' open':''}" data-single="1" style="margin-bottom:4px">
-      <div class="author-swipe-content"
-        ontouchstart="_authorSwipeX=event.touches[0].clientX"
-        ontouchend="stSwipeEnd(event,'${key}',${i})">
-        <div style="background:var(--bg);border:.5px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px">
-          <div style="display:flex;gap:8px;align-items:flex-start">
-            <div style="flex:1;min-width:0">
-              <div style="display:flex;align-items:center;gap:4px">
-                <input type="text" class="st-inline-name" value="${escHtml(r.label||'')}" placeholder="Item name"
-                  onblur="if(S.${key}&&S.${key}[${i}])S.${key}[${i}].label=this.value;saveState()"
-                  onkeydown="if(event.key==='Enter')this.blur()">
-                <button class="icon-btn del-btn" onclick="if(confirm('Delete this item?'))delStRow('${key}',${i})" style="flex-shrink:0" title="Delete">
-                  <i class="ti ti-trash"></i>
-                </button>
-              </div>
-              <input type="text" class="st-inline-note" value="${escHtml(r.notes||'')}" placeholder="Notes…"
-                onblur="if(S.${key}&&S.${key}[${i}])S.${key}[${i}].notes=this.value;saveState()"
-                onkeydown="if(event.key==='Enter')this.blur()">
-            </div>
-            <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0">
-              <div style="display:flex;gap:4px;align-items:center">
-                <span style="font-size:10px;color:var(--text3)">Est</span>
-                ${moneyInSt('se'+key+i+'e', r.est, key, i, 'est', 'width:72px;font-size:12px')}
-              </div>
-              <div style="display:flex;gap:4px;align-items:center">
-                <span style="font-size:10px;color:var(--text3)">Spent</span>
-                ${moneyInSt('se'+key+i+'s', r.spent, key, i, 'spent', 'width:72px;font-size:12px')}
-              </div>
-              ${diff!==null?`<div style="font-size:10px">${dh}</div>`:''}
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="author-swipe-actions" style="width:80px">
-        <button class="author-action" style="background:var(--red)" onclick="delStRow('${key}',${i})">
-          <i class="ti ti-trash"></i><span>Delete</span>
-        </button>
-      </div>
-    </div>`;
-  }).join('');
-
-  return `<div class="card" id="st-${key}">
-    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
-      <span>${title}</span>
-      <div style="display:flex;gap:6px;align-items:center">
-        <span style="font-size:10px;color:var(--text2)">Est ${fmt(totEst)} · Spent ${fmt(totSpent)} · ${fmt(perTix)}/tix${parent?' → <em>'+escHtml(parent.label)+'</em>':''}</span>
-        <button class="icon-btn" onclick="addESRow('${key}')"><i class="ti ti-plus"></i></button>
-      </div>
-    </div>
-    ${rowsHtml}
-    <div style="padding:4px 0;font-weight:600;font-size:12px;display:flex;justify-content:space-between">
-      <span>Total</span>
-      <span>${fmt(totEst)} est · ${fmt(totSpent)} spent</span>
-    </div>
-  </div>`;
+function deleteExp(i) {
+  S.expenses.splice(i,1);
+  saveState(); renderFinances();
 }
 
-function delStRow(key,i){if(S[key])S[key].splice(i,1);saveState();renderFinances();}
-function addPQRow(key){if(S[key])S[key].push({label:'New',size:'',price:0,qty:0,notes:''});saveState();renderFinances();}
-function addESRow(key){if(S[key])S[key].push({label:'New item',est:0,spent:0,notes:'',url:''});saveState();renderFinances();}
+function moveExp(i, dir) {
+  const j = i+dir;
+  if (j<0||j>=S.expenses.length) return;
+  [S.expenses[i],S.expenses[j]] = [S.expenses[j],S.expenses[i]];
+  saveState(); renderFinances();
+}
+
+// ── Add / Edit expense modal ──────────────────────────────────────────────────
 
 function openAddExpense() {
+  const att = S.attendance;
   showModal(`
     <h3>Add expense line</h3>
-    <div class="field"><label>Name</label><input type="text" id="ae-label" placeholder="e.g. Photo booth"></div>
-    <div class="field"><label>Price type</label>
-      <div style="display:flex;gap:12px;margin-top:4px">
-        <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="radio" name="ae-type" value="fixed" checked onchange="aeType('fixed')"> Fixed total</label>
-        <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="radio" name="ae-type" value="perunit" onchange="aeType('perunit')"> Per item</label>
+    <div class="field"><label>Name</label><input type="text" id="ae-name" placeholder="e.g. Photo booth"></div>
+    <div class="field"><label>Type</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
+        <label class="radio-card" id="ae-lbl-fixed">
+          <input type="radio" name="ae-type" value="fixed" checked onchange="aeTypeChange()"> Fixed total
+        </label>
+        <label class="radio-card" id="ae-lbl-per">
+          <input type="radio" name="ae-type" value="perunit" onchange="aeTypeChange()"> Per person
+        </label>
       </div>
     </div>
-    <div id="ae-fixed-f"><div class="field"><label>Total ($)</label><input type="text" inputmode="decimal" id="ae-fixed" placeholder="0.00" class="ni money-in"></div></div>
-    <div id="ae-per-f" style="display:none">
-      <div class="field"><label>Price per item ($)</label><input type="text" inputmode="decimal" id="ae-unit" placeholder="0.00" class="ni money-in"></div>
-      <div class="field"><label>Quantity</label><input type="text" inputmode="numeric" id="ae-qty" value="${S.attendance.total}" class="ni num-in"></div>
-      <div class="field"><label>Unit label</label><input type="text" id="ae-ulbl" placeholder="e.g. per person"></div>
+    <div id="ae-fixed-fields">
+      <div class="field"><label>Amount ($)</label><input type="text" inputmode="decimal" id="ae-fixed" placeholder="0.00"></div>
     </div>
-    <div class="field"><label>Notes</label><input type="text" id="ae-notes" placeholder="Optional…"></div>
+    <div id="ae-per-fields" style="display:none">
+      <div class="field"><label>Price per item ($)</label><input type="text" inputmode="decimal" id="ae-unit" placeholder="0.00"></div>
+      <div class="field"><label>Based on</label>
+        <select id="ae-based">
+          <option value="total">Total attendees (${att.total})</option>
+          <option value="authors">Authors only (${att.authors})</option>
+        </select>
+      </div>
+    </div>
+    <div class="field"><label>Notes (optional)</label><input type="text" id="ae-notes" placeholder="Any notes…"></div>
     <div class="m-actions">
       <button class="btn" onclick="closeModal()">Cancel</button>
       <button class="btn primary" onclick="doAddExpense()"><i class="ti ti-plus"></i> Add</button>
     </div>`);
-  setTimeout(()=>document.getElementById('ae-label')?.focus(),50);
-}
-function aeType(t){document.getElementById('ae-fixed-f').style.display=t==='fixed'?'block':'none';document.getElementById('ae-per-f').style.display=t==='perunit'?'block':'none';}
-function parseMoney(id){return Math.round(parseFloat((document.getElementById(id)?.value||'0').replace(/[^0-9.\-]/g,''))*100)/100||0;}
-function parseNum(id){return parseInt((document.getElementById(id)?.value||'0').replace(/[^0-9]/g,''),10)||0;}
-function doAddExpense(){
-  const label=document.getElementById('ae-label')?.value?.trim();
-  if(!label){alert('Please enter a name.');return;}
-  const t=document.querySelector('input[name="ae-type"]:checked')?.value||'fixed';
-  const line={id:'custom_'+S.nextId++,label,type:t,notes:document.getElementById('ae-notes')?.value?.trim()||'',spent:0,expanded:false};
-  if(t==='fixed') line.fixedAmt=parseMoney('ae-fixed');
-  else{line.unitPrice=parseMoney('ae-unit');line.qty=parseNum('ae-qty')||S.attendance.total;line.unitLabel=document.getElementById('ae-ulbl')?.value?.trim()||'';}
-  S.expenses.push(line);saveState();closeModal();renderFinances();
+  setTimeout(()=>document.getElementById('ae-name')?.focus(),50);
 }
 
-function expSwipeStart(e,i){ _expSwipeX = e.touches[0].clientX; }
-function expSwipeEnd(e,i){
-  const dx = e.changedTouches[0].clientX - _expSwipeX;
-  if(dx < -50) _swipedExpIdx = i;
-  else if(dx > 20) _swipedExpIdx = null;
-  renderFinances();
+function aeTypeChange() {
+  const t = document.querySelector('input[name="ae-type"]:checked')?.value;
+  document.getElementById('ae-fixed-fields').style.display = t==='fixed'?'block':'none';
+  document.getElementById('ae-per-fields').style.display   = t==='perunit'?'block':'none';
+}
+
+function doAddExpense() {
+  const name = document.getElementById('ae-name')?.value?.trim();
+  if (!name) { alert('Please enter a name.'); return; }
+  const t = document.querySelector('input[name="ae-type"]:checked')?.value || 'fixed';
+  const line = {id:'custom_'+S.nextId++, label:name, type:t, spent:0, notes:document.getElementById('ae-notes')?.value?.trim()||'', expanded:false};
+  if (t==='fixed') {
+    line.fixedAmt = parseFloat(document.getElementById('ae-fixed')?.value)||0;
+  } else {
+    line.unitPrice = parseFloat(document.getElementById('ae-unit')?.value)||0;
+    const based = document.getElementById('ae-based')?.value || 'total';
+    line.unitLabelType = based;
+    line.unitLabel = based==='authors' ? 'per author' : 'per person';
+    line.qty = based==='authors' ? S.attendance.authors : S.attendance.total;
+  }
+  S.expenses.push(line);
+  saveState(); closeModal(); renderFinances();
 }
 
 function openEditExpense(i) {
-  _swipedExpIdx = null;
   const e = S.expenses[i];
-  if(!e) return;
-  const isFixed  = e.type==='fixed';
-  const isPerUnit= e.type==='perunit';
-  const isSub    = e.type==='subtable';
+  if (!e) return;
+  const isFixed  = e.type === 'fixed' || e.type === 'cc_fee';
+  const isPer    = e.type === 'perunit';
+  const isSub    = e.type === 'subtable';
+  const isCC     = e.type === 'cc_fee';
   showModal(`
     <h3>Edit: ${escHtml(e.label)}</h3>
-    <div class="field"><label>Name</label>
-      <input type="text" id="ee-label" value="${escHtml(e.label)}"></div>
-    ${isFixed?`<div class="field"><label>Total amount ($)</label>
-      <input type="text" inputmode="decimal" id="ee-fixed" value="${(+(e.fixedAmt||0)).toFixed(2)}" class="ni money-in" style="width:100%"></div>`:''}
-    ${isPerUnit?`
-    <div class="field"><label>Price per item ($)</label>
-      <input type="text" inputmode="decimal" id="ee-unit" value="${(+(e.unitPrice||0)).toFixed(2)}" class="ni money-in" style="width:100%"></div>
-    <div class="field"><label>Quantity</label>
-      <input type="text" inputmode="numeric" id="ee-qty" value="${e.qty||0}" class="ni num-in" style="width:100%"></div>
-    <div class="field"><label>Unit label</label>
-      <input type="text" id="ee-ulbl" value="${escHtml(e.unitLabel||'')}"></div>`:''}
-    ${isSub?`<div style="font-size:12px;color:var(--text2);margin-bottom:10px">This line pulls its total from the <strong>${escHtml(e.subtable)}</strong> table below. Edit the rows in that table to change the total.</div>`:''}
+    <div class="field"><label>Name</label><input type="text" id="ee-name" value="${escHtml(e.label)}"></div>
+    ${isCC?`<div class="field"><label>CC fee %</label><input type="text" inputmode="decimal" id="ee-cc" value="${e.ccPct||S.ccFeePercent||3.2}"></div>`:''}
+    ${e.type==='fixed'?`<div class="field"><label>Amount ($)</label><input type="text" inputmode="decimal" id="ee-fixed" value="${(+(e.fixedAmt||0)).toFixed(2)}"></div>`:''}
+    ${isPer?`
+      <div class="field"><label>Price per item ($)</label><input type="text" inputmode="decimal" id="ee-unit" value="${(+(e.unitPrice||0)).toFixed(2)}"></div>
+      <div class="field"><label>Based on</label>
+        <select id="ee-based">
+          <option value="total"${e.unitLabelType!=='authors'?' selected':''}>Total attendees</option>
+          <option value="authors"${e.unitLabelType==='authors'?' selected':''}>Authors only</option>
+        </select>
+      </div>`:''}
+    ${isSub?`<div style="font-size:12px;color:var(--text2);padding:8px 0">This line pulls from the <strong>${escHtml(e.subtable)}</strong> section below.</div>`:''}
     ${e.tip&&e.tip.enabled?`
-    <div class="field"><label>Tip type</label>
-      <select id="ee-tiptype">
-        <option value="fixed"${e.tip.type==='fixed'?' selected':''}>Fixed $</option>
-        <option value="pct"${e.tip.type==='pct'?' selected':''}>Percentage %</option>
-      </select></div>
-    <div class="field"><label>Tip amount</label>
-      <input type="text" inputmode="decimal" id="ee-tipamt" value="${e.tip.type==='pct'?e.tip.pct:(+(e.tip.fixedAmt||0)).toFixed(2)}"></div>`:''}
-    <div class="field"><label>Notes</label>
-      <input type="text" id="ee-notes" value="${escHtml(e.notes||'')}"></div>
+      <div class="field"><label>Tip type</label>
+        <select id="ee-tiptype"><option value="fixed"${e.tip.type==='fixed'?' selected':''}>Fixed $</option><option value="pct"${e.tip.type==='pct'?' selected':''}>%</option></select>
+      </div>
+      <div class="field"><label>Tip amount</label>
+        <input type="text" inputmode="decimal" id="ee-tipamt" value="${e.tip.type==='pct'?e.tip.pct:(+(e.tip.fixedAmt||0)).toFixed(2)}">
+      </div>`:''}
+    <div class="field"><label>Notes</label><input type="text" id="ee-notes" value="${escHtml(e.notes||'')}"></div>
     <div class="m-actions">
       <button class="btn" onclick="closeModal()">Cancel</button>
       <button class="btn primary" onclick="doEditExpense(${i})"><i class="ti ti-check"></i> Save</button>
     </div>`);
-  setTimeout(()=>document.getElementById('ee-label')?.focus(),50);
 }
 
 function doEditExpense(i) {
   const e = S.expenses[i];
-  if(!e) return;
-  e.label = document.getElementById('ee-label')?.value?.trim() || e.label;
+  if (!e) return;
+  e.label = document.getElementById('ee-name')?.value?.trim() || e.label;
   e.notes = document.getElementById('ee-notes')?.value?.trim() || '';
-  if(e.type==='fixed') {
-    e.fixedAmt = parseFloat(document.getElementById('ee-fixed')?.value||0) || 0;
-  } else if(e.type==='perunit') {
-    e.unitPrice = parseFloat(document.getElementById('ee-unit')?.value||0) || 0;
-    e.qty = parseInt(document.getElementById('ee-qty')?.value||0,10) || 0;
-    e.unitLabel = document.getElementById('ee-ulbl')?.value?.trim() || '';
+  if (e.type==='fixed')   e.fixedAmt  = parseFloat(document.getElementById('ee-fixed')?.value)||0;
+  if (e.type==='cc_fee')  e.ccPct     = parseFloat(document.getElementById('ee-cc')?.value)||3.2;
+  if (e.type==='perunit') {
+    e.unitPrice = parseFloat(document.getElementById('ee-unit')?.value)||0;
+    const based = document.getElementById('ee-based')?.value||'total';
+    e.unitLabelType = based;
+    e.unitLabel = based==='authors'?'per author':'per person';
+    e.qty = based==='authors' ? S.attendance.authors : S.attendance.total;
   }
-  if(e.tip && e.tip.enabled) {
+  if (e.tip && e.tip.enabled) {
     e.tip.type = document.getElementById('ee-tiptype')?.value || e.tip.type;
-    const tipVal = parseFloat(document.getElementById('ee-tipamt')?.value||0) || 0;
-    if(e.tip.type==='pct') e.tip.pct = tipVal;
-    else e.tip.fixedAmt = tipVal;
+    const tv = parseFloat(document.getElementById('ee-tipamt')?.value)||0;
+    if (e.tip.type==='pct') e.tip.pct=tv; else e.tip.fixedAmt=tv;
   }
   saveState(); closeModal(); renderFinances();
 }
 
-// ── Scroll helper ─────────────────────────────────────────────────────────────
-function scrollToSection(id) {
-  const el = document.getElementById(id);
-  if (el) el.scrollIntoView({behavior:'smooth', block:'start'});
-}
-
 // ── Merch section ─────────────────────────────────────────────────────────────
-function stMerch() {
-  const active = S.merchType || 'hats';
-  const labels = {hats:'Hats', tshirts:'T-shirts', ...(S.merchLabels||{})};
-  const allMerch = S.merchOptions || ['hats','tshirts'];
-  
-  // Ensure custom merch options exist in S
-  allMerch.forEach(key => { if(!S[key]) S[key]=[]; });
 
-  const toggleBtns = allMerch.map(key => 
-    `<button class="btn" style="${active===key?'background:var(--purple-bg);color:var(--purple-text);border-color:var(--purple)':''}"
-      onclick="S.merchType='${key}';saveState();renderFinances()">
+function renderMerchSection() {
+  const allMerch = S.merchOptions || ['hats','tshirts'];
+  const labels   = {hats:'Hats', tshirts:'T-shirts', ...(S.merchLabels||{})};
+  const active   = S.merchType || 'hats';
+
+  const toggleBtns = allMerch.map(key =>
+    `<button class="merch-toggle-btn${key===active?' active':''}" onclick="setActiveMerch('${key}')">
       ${escHtml(labels[key]||key)}
     </button>`
   ).join('');
 
+  const sections = allMerch.map(key => {
+    const rows  = S[key] || [];
+    const total = rows.reduce((s,r) => s+Math.round((+r.price||0)*(+r.qty||0)*100)/100, 0);
+    const isAct = key === active;
+    const rowsHtml = rows.map((r,i) => {
+      const isOpen = _stSwipedKey===key && _stSwipedIdx===i;
+      return `<div class="st-row${isOpen?' swiped':''}" id="str-${key}-${i}">
+        <div class="st-row-content" ontouchstart="_authorSwipeX=event.touches[0].clientX" ontouchend="stSwipeEnd(event,'${key}',${i})">
+          <div style="display:flex;align-items:center;gap:6px;padding:7px 10px;background:var(--bg);border:.5px solid var(--border);border-radius:var(--radius-sm)">
+            <input class="st-name-input" type="text" value="${escHtml(r.label||'')}" placeholder="Size/style"
+              onblur="stSaveField('${key}',${i},'label',this.value)"
+              onkeydown="if(event.key==='Enter')this.blur()">
+            ${moneyIn('stp'+key+i, r.price, `stSaveField('${key}',${i},'price',parseFloat(this.value)||0)`, 'width:70px;font-size:12px')}
+            ${numIn('stq'+key+i, r.qty, `stSaveField('${key}',${i},'qty',parseInt(this.value)||0)`, 'width:52px;font-size:12px;text-align:right')}
+            <span style="font-size:12px;font-weight:600;min-width:60px;text-align:right">${fmt((+r.price||0)*(+r.qty||0))}</span>
+            <button class="icon-btn del-btn" onclick="confirmDelete('Delete this item?',()=>{S.${key}.splice(${i},1);saveState();renderFinances()})" title="Delete">
+              <i class="ti ti-trash" style="font-size:13px"></i>
+            </button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+
+    return `<div style="margin-bottom:10px;border:.5px solid ${isAct?'var(--green)':'var(--border)'};border-radius:var(--radius-sm);padding:8px;opacity:${isAct?1:0.55}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div style="font-size:12px;font-weight:600;color:${isAct?'var(--green)':'var(--text2)'}">
+          ${escHtml(labels[key]||key)} ${isAct?'✓ Active':''} · ${fmt(total)}
+        </div>
+        <div style="display:flex;gap:4px">
+          <button class="icon-btn" onclick="S.${key}.push({label:'',price:0,qty:0});saveState();renderFinances()" title="Add row">
+            <i class="ti ti-plus" style="font-size:13px"></i>
+          </button>
+          ${!['hats','tshirts'].includes(key)?`
+          <button class="icon-btn del-btn" onclick="deleteMerchCategory('${key}')" title="Delete category">
+            <i class="ti ti-trash" style="font-size:13px"></i>
+          </button>`:''}
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 70px 52px 60px 30px;gap:4px;padding:0 4px;margin-bottom:3px">
+        <span style="font-size:10px;color:var(--text3)">Size/style</span>
+        <span style="font-size:10px;color:var(--text3);text-align:right">Price</span>
+        <span style="font-size:10px;color:var(--text3);text-align:right">Qty</span>
+        <span style="font-size:10px;color:var(--text3);text-align:right">Total</span>
+        <span></span>
+      </div>
+      ${rowsHtml}
+    </div>`;
+  }).join('');
+
   return `<div class="card" id="st-merch">
-    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
-      <span>Merch</span>
-      <button class="btn" style="font-size:11px;padding:3px 9px" onclick="addMerchOption()">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div class="card-title" style="margin-bottom:0">Merch</div>
+      <button class="btn" style="font-size:11px;padding:3px 8px" onclick="openAddMerchCategory()">
         <i class="ti ti-plus"></i> Add option
       </button>
     </div>
@@ -583,41 +449,30 @@ function stMerch() {
       <span style="font-size:12px;color:var(--text2)">Active this year:</span>
       ${toggleBtns}
     </div>
-    <div style="font-size:11px;color:var(--text2);margin-bottom:10px">Only the active option feeds into the budget above.</div>
-    ${allMerch.map(key => {
-      const rows = S[key]||[];
-      const total = rows.reduce((s,r)=>s+Math.round((+r.price||0)*(+r.qty||0)*100)/100, 0);
-      const isActive = key === active;
-      return `<div style="margin-bottom:12px;border:.5px solid ${isActive?'var(--green)':'var(--border)'};border-radius:var(--radius-sm);padding:8px;opacity:${isActive?1:0.6}">
-        <div style="font-size:12px;font-weight:600;color:${isActive?'var(--green)':'var(--text2)'};margin-bottom:6px">
-          ${escHtml(labels[key]||key)} ${isActive?'✓ Active':''}
-          <span style="float:right;font-weight:400">${fmt(total)}</span>
-        </div>
-        <table class="st-tbl">
-          <thead><tr><th>Size/style</th><th style="text-align:right">Price</th><th style="text-align:right">Qty</th><th style="text-align:right">Total</th><th></th></tr></thead>
-          <tbody>
-            ${rows.map((r,i)=>`<tr>
-              <td><input type="text" class="st-text" value="${escHtml(r.label||r.size||'')}"
-                onblur="if(S.${key}[${i}]){S.${key}[${i}].label=this.value;S.${key}[${i}].size=this.value;}saveState()"
-                onkeydown="if(event.key==='Enter')this.blur()"></td>
-              <td>${moneyInSt('sm'+key+i+'p',r.price,key,i,'price','width:58px')}</td>
-              <td>${numInSt('sm'+key+i+'q',r.qty,key,i,'qty','width:46px;text-align:right')}</td>
-              <td style="text-align:right;font-size:12px;font-weight:600">${fmt((+r.price||0)*(+r.qty||0))}</td>
-              <td><button class="icon-btn del-btn" onclick="delStRow('${key}',${i})"><i class="ti ti-x"></i></button></td>
-            </tr>`).join('')}
-          </tbody>
-          <tfoot><tr>
-            <td colspan="3" style="font-weight:600">Total</td>
-            <td style="text-align:right;font-weight:700">${fmt(total)}</td>
-            <td><button class="icon-btn" onclick="addPQRow('${key}')"><i class="ti ti-plus"></i></button></td>
-          </tr></tfoot>
-        </table>
-      </div>`;
-    }).join('')}
+    <div style="font-size:11px;color:var(--text2);margin-bottom:10px">Only the active option feeds into the budget.</div>
+    ${sections}
   </div>`;
 }
 
-function addMerchOption() {
+function setActiveMerch(key) {
+  S.merchType = key;
+  saveState(); renderFinances();
+}
+
+function deleteMerchCategory(key) {
+  const label = (S.merchLabels||{})[key] || key;
+  confirmDelete(`Delete merch category "${label}"? This cannot be undone.`, () => {
+    S.merchOptions = (S.merchOptions||[]).filter(k => k!==key);
+    if (S.merchLabels) delete S.merchLabels[key];
+    if (S[key]) delete S[key];
+    // Remove from expenses
+    S.expenses = S.expenses.filter(e => !(e.type==='subtable' && e.subtable===key));
+    if (S.merchType === key) S.merchType = (S.merchOptions||['hats'])[0];
+    saveState(); renderFinances();
+  });
+}
+
+function openAddMerchCategory() {
   showModal(`
     <h3>Add merch option</h3>
     <div class="field"><label>Name (e.g. Water bottles)</label>
@@ -625,38 +480,223 @@ function addMerchOption() {
     </div>
     <div class="m-actions">
       <button class="btn" onclick="closeModal()">Cancel</button>
-      <button class="btn primary" onclick="doAddMerchOption()">Add</button>
+      <button class="btn primary" onclick="doAddMerchCategory()">Add</button>
     </div>`);
   setTimeout(()=>document.getElementById('nm-name')?.focus(),50);
 }
 
-function doAddMerchOption() {
+function doAddMerchCategory() {
   const name = document.getElementById('nm-name')?.value?.trim();
   if (!name) { alert('Please enter a name.'); return; }
   const key = name.toLowerCase().replace(/[^a-z0-9]/g,'_');
   if (!S.merchOptions) S.merchOptions = ['hats','tshirts'];
-  if (!S.merchOptions.includes(key)) {
-    S.merchOptions.push(key);
-    // Add an expense subtable row for this merch option
-    S.expenses.push({
-      id: key, label: name, type:'subtable', subtable:key,
-      spent:0, notes:'', expanded:false
-    });
-  }
-  if (!S[key]) S[key] = [{label:'',price:0,qty:0}];
+  if (S.merchOptions.includes(key)) { alert('That option already exists.'); return; }
+  S.merchOptions.push(key);
   if (!S.merchLabels) S.merchLabels = {};
   S.merchLabels[key] = name;
+  S[key] = [];
+  // Add expense line for it
+  S.expenses.push({id:key, label:name, type:'subtable', subtable:key, spent:0, notes:'', expanded:false});
   saveState(); closeModal(); renderFinances();
-  setTimeout(()=>scrollToSection('st-merch'),100);
+  setTimeout(()=>scrollToId('st-merch'),100);
 }
 
-// Subtable row swipe state
-window._stSwipedKey = null;
-window._stSwipedIdx = null;
+// ── Subtable: Est/Spent (decorations, misc, prizes, swag) ────────────────────
 
-function stSwipeEnd(e, key, idx) {
+function stEstSpent(key, title) {
+  const rows     = S[key] || [];
+  const totEst   = rows.reduce((s,r) => s+(+r.est||0), 0);
+  const totSpent = rows.reduce((s,r) => s+(+r.spent||0), 0);
+  const {paying} = calcTotals();
+  const perTix   = paying > 0 ? Math.round(totEst/paying*100)/100 : 0;
+
+  const rowsHtml = rows.map((r,i) => {
+    const diff = r.spent > 0 ? Math.round((+r.spent-(+r.est||0))*100)/100 : null;
+    return `<div style="padding:7px 0;border-bottom:.5px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:6px">
+        <div style="flex:1;min-width:0">
+          <input class="st-name-input" type="text" value="${escHtml(r.label||'')}" placeholder="Item name"
+            onblur="stSaveField('${key}',${i},'label',this.value)"
+            onkeydown="if(event.key==='Enter')this.blur()">
+          ${r.notes?`<div style="font-size:10px;color:var(--text3);margin-top:1px">${escHtml(r.notes)}</div>`:''}
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+          <div style="text-align:right">
+            <div style="font-size:10px;color:var(--text3)">Est</div>
+            ${moneyIn('se'+key+i+'e', r.est, `stSaveField('${key}',${i},'est',parseFloat(this.value)||0)`, 'width:70px;font-size:12px')}
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:10px;color:var(--text3)">Spent</div>
+            ${moneyIn('se'+key+i+'s', r.spent, `stSaveField('${key}',${i},'spent',parseFloat(this.value)||0)`, 'width:70px;font-size:12px')}
+          </div>
+          ${diff!==null?`<div style="font-size:10px;color:${diff>0?'var(--red)':'var(--green)'};min-width:40px;text-align:right">${diff>0?'+':''}${fmt(diff)}</div>`:'<div style="min-width:40px"></div>'}
+          <button class="icon-btn" onclick="openEditStRow('${key}',${i})" title="Edit"><i class="ti ti-pencil" style="font-size:13px"></i></button>
+          <button class="icon-btn del-btn" onclick="confirmDelete('Delete \\'${escHtml(r.label||'this item')}\\'?',()=>deleteStRow('${key}',${i}))" title="Delete">
+            <i class="ti ti-trash" style="font-size:13px"></i>
+          </button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  return `<div class="card" id="st-${key}">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-size:13px;font-weight:600">${title}</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:11px;color:var(--text2)">Est ${fmt(totEst)} · Spent ${fmt(totSpent)} · ${fmt(perTix)}/tix</span>
+        <button class="icon-btn" onclick="openAddStRow('${key}')" title="Add item"><i class="ti ti-plus" style="font-size:14px"></i></button>
+      </div>
+    </div>
+    ${rowsHtml}
+    ${rows.length===0?`<div style="color:var(--text3);font-size:12px;padding:8px 0">No items yet. Tap + to add one.</div>`:''}
+  </div>`;
+}
+
+function openAddStRow(key) {
+  showModal(`
+    <h3>Add item</h3>
+    <div class="field"><label>Item name</label><input type="text" id="asr-name" placeholder="What is it?"></div>
+    <div class="field"><label>Estimated cost ($)</label><input type="text" inputmode="decimal" id="asr-est" placeholder="0.00"></div>
+    <div class="field"><label>Notes (optional)</label><input type="text" id="asr-notes" placeholder="Any notes…"></div>
+    <div class="m-actions">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn primary" onclick="doAddStRow('${key}')"><i class="ti ti-plus"></i> Add</button>
+    </div>`);
+  setTimeout(()=>document.getElementById('asr-name')?.focus(),50);
+}
+
+function doAddStRow(key) {
+  const name = document.getElementById('asr-name')?.value?.trim();
+  if (!name) { alert('Please enter a name.'); return; }
+  if (!S[key]) S[key] = [];
+  S[key].push({
+    label: name,
+    est:   parseFloat(document.getElementById('asr-est')?.value)||0,
+    spent: 0,
+    notes: document.getElementById('asr-notes')?.value?.trim()||'',
+    url:   ''
+  });
+  saveState(); closeModal(); renderFinances();
+}
+
+function openEditStRow(key, i) {
+  const r = (S[key]||[])[i];
+  if (!r) return;
+  showModal(`
+    <h3>Edit item</h3>
+    <div class="field"><label>Name</label><input type="text" id="esr-name" value="${escHtml(r.label||'')}"></div>
+    <div class="field"><label>Estimated ($)</label><input type="text" inputmode="decimal" id="esr-est" value="${(+(r.est||0)).toFixed(2)}"></div>
+    <div class="field"><label>Spent ($)</label><input type="text" inputmode="decimal" id="esr-spent" value="${(+(r.spent||0)).toFixed(2)}"></div>
+    <div class="field"><label>Notes</label><input type="text" id="esr-notes" value="${escHtml(r.notes||'')}"></div>
+    <div class="field"><label>URL (optional)</label><input type="text" id="esr-url" value="${escHtml(r.url||'')}"></div>
+    <div class="m-actions">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn primary" onclick="doEditStRow('${key}',${i})"><i class="ti ti-check"></i> Save</button>
+    </div>`);
+}
+
+function doEditStRow(key, i) {
+  const r = (S[key]||[])[i];
+  if (!r) return;
+  r.label = document.getElementById('esr-name')?.value?.trim()  || r.label;
+  r.est   = parseFloat(document.getElementById('esr-est')?.value)  || 0;
+  r.spent = parseFloat(document.getElementById('esr-spent')?.value) || 0;
+  r.notes = document.getElementById('esr-notes')?.value?.trim() || '';
+  r.url   = document.getElementById('esr-url')?.value?.trim()   || '';
+  saveState(); closeModal(); renderFinances();
+}
+
+function deleteStRow(key, i) {
+  if (S[key]) S[key].splice(i,1);
+  saveState(); renderFinances();
+}
+
+// ── Subtable: Price/Qty (totes) ───────────────────────────────────────────────
+
+function stPriceQty(key, title) {
+  const rows  = S[key] || [];
+  const total = rows.reduce((s,r) => s + Math.round((+r.price||0)*(+r.qty||0)*100)/100, 0);
+  const {paying} = calcTotals();
+  const perTix = paying > 0 ? Math.round(total/paying*100)/100 : 0;
+
+  const rowsHtml = rows.map((r,i) => `
+    <div style="display:grid;grid-template-columns:1fr 72px 56px 64px 30px;gap:6px;align-items:center;padding:6px 0;border-bottom:.5px solid var(--border)">
+      <input class="st-name-input" type="text" value="${escHtml(r.label||'')}" placeholder="Style"
+        onblur="stSaveField('${key}',${i},'label',this.value)"
+        onkeydown="if(event.key==='Enter')this.blur()">
+      ${moneyIn('stp'+key+i, r.price, `stSaveField('${key}',${i},'price',parseFloat(this.value)||0)`, 'width:100%;font-size:12px')}
+      ${numIn('stq'+key+i, r.qty, `stSaveField('${key}',${i},'qty',parseInt(this.value)||0)`, 'width:100%;font-size:12px;text-align:right')}
+      <span style="font-size:12px;font-weight:600;text-align:right">${fmt((+r.price||0)*(+r.qty||0))}</span>
+      <button class="icon-btn del-btn" onclick="confirmDelete('Delete this row?',()=>deleteStRow('${key}',${i}))" title="Delete">
+        <i class="ti ti-trash" style="font-size:13px"></i>
+      </button>
+    </div>`).join('');
+
+  return `<div class="card" id="st-${key}">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-size:13px;font-weight:600">${title}</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:11px;color:var(--text2)">${fmt(total)} · ${fmt(perTix)}/tix</span>
+        <button class="icon-btn" onclick="openAddPQRow('${key}')" title="Add row"><i class="ti ti-plus" style="font-size:14px"></i></button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 72px 56px 64px 30px;gap:4px;padding:0 2px;margin-bottom:3px">
+      <span style="font-size:10px;color:var(--text3)">Style</span>
+      <span style="font-size:10px;color:var(--text3);text-align:right">Price</span>
+      <span style="font-size:10px;color:var(--text3);text-align:right">Qty</span>
+      <span style="font-size:10px;color:var(--text3);text-align:right">Total</span>
+      <span></span>
+    </div>
+    ${rowsHtml}
+    ${rows.length===0?`<div style="color:var(--text3);font-size:12px;padding:8px 0">No rows yet. Tap + to add.</div>`:''}
+    <div style="display:flex;justify-content:space-between;padding:6px 0;font-weight:600;font-size:12px">
+      <span>Total</span><span>${fmt(total)}</span>
+    </div>
+  </div>`;
+}
+
+function openAddPQRow(key) {
+  showModal(`
+    <h3>Add row</h3>
+    <div class="field"><label>Size / style</label><input type="text" id="apq-label" placeholder="e.g. Standard"></div>
+    <div class="field"><label>Price ($)</label><input type="text" inputmode="decimal" id="apq-price" placeholder="0.00"></div>
+    <div class="field"><label>Quantity</label><input type="text" inputmode="numeric" id="apq-qty" value="${S.attendance.total}"></div>
+    <div class="m-actions">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn primary" onclick="doAddPQRow('${key}')"><i class="ti ti-plus"></i> Add</button>
+    </div>`);
+  setTimeout(()=>document.getElementById('apq-label')?.focus(),50);
+}
+
+function doAddPQRow(key) {
+  if (!S[key]) S[key] = [];
+  S[key].push({
+    label: document.getElementById('apq-label')?.value?.trim()||'',
+    price: parseFloat(document.getElementById('apq-price')?.value)||0,
+    qty:   parseInt(document.getElementById('apq-qty')?.value)||0,
+    notes:''
+  });
+  saveState(); closeModal(); renderFinances();
+}
+
+// ── Shared subtable helpers ───────────────────────────────────────────────────
+
+function stSaveField(key, i, field, val) {
+  if (S[key] && S[key][i] !== undefined) {
+    S[key][i][field] = val;
+    saveState();
+    renderFinances();
+  }
+}
+
+function stSwipeEnd(e, key, i) {
   const dx = e.changedTouches[0].clientX - _authorSwipeX;
-  if (dx < -50) { window._stSwipedKey=key; window._stSwipedIdx=idx; }
-  else if (dx > 20) { window._stSwipedKey=null; window._stSwipedIdx=null; }
+  _stSwipedKey = dx < -50 ? key : null;
+  _stSwipedIdx = dx < -50 ? i   : null;
   renderFinances();
+}
+
+function scrollToId(id) {
+  const el = document.getElementById(id);
+  if (el) el.scrollIntoView({behavior:'smooth', block:'start'});
 }
