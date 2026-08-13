@@ -155,8 +155,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--purple)}
 .exp-cell-total { text-align:right; }
 .exp-cell-spent { text-align:right; }
 
-/* remove old conflicting rules */
-.exp-mobile-nums, .exp-mobile-spent { display:none; }
+/* exp-mobile-nums and exp-mobile-spent are used by expRow */
 
 @media(max-width:380px) {
   .exp-mobile-row { grid-template-columns:18px 1fr 64px 42px 64px 66px; gap:3px; }
