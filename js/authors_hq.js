@@ -96,7 +96,7 @@ function authorCard(a) {
   return `<div class="author-swipe-row${isOpen?' open':''}" id="arow-${a.id}" style="margin-bottom:6px">
     <div class="author-swipe-content" ontouchstart="_authorSwipeX=event.touches[0].clientX" ontouchend="authorSwipeEnd(event,'${a.id}')">
       <div style="border:.5px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;background:var(--bg)">
-        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer" onclick="toggleAuthorExpand(${idx})">
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer" onclick="toggleAuthorExpand('${a.id}')">
           <div class="avatar">${escHtml(ini)}</div>
           <div style="flex:1;min-width:0">
             <div style="font-size:13px;font-weight:600">${escHtml(a.name||'')}</div>
@@ -183,7 +183,11 @@ function setAuthorField(idx, field, val) {
 }
 
 function toggleAuthorExpand(idx) {
-  if (S.authors[idx]) S.authors[idx]._expanded = !S.authors[idx]._expanded;
+  // Support both index and id
+  const a = typeof idx === 'string' 
+    ? (S.authors||[]).find(x=>x.id===idx)
+    : S.authors[idx];
+  if (a) a._expanded = !a._expanded;
   saveState(); renderAuthors();
 }
 
