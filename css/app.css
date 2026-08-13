@@ -183,3 +183,17 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--purple)}
 
 .sort-btn{padding:4px 9px;border-radius:var(--radius-sm);border:.5px solid var(--border);background:var(--bg);color:var(--text2);font-size:11px;cursor:pointer}
 .sort-btn.active{color:var(--text);font-weight:600;border-color:var(--border2);background:var(--bg2)}
+
+/* Subtable inline inputs */
+.st-inline-name {
+  width:100%; font-size:13px; font-weight:500;
+  border:none; background:transparent; color:var(--text);
+  padding:0; font-family:inherit;
+}
+.st-inline-name:focus { outline:none; border-bottom:1px solid var(--purple); }
+.st-inline-note {
+  width:100%; font-size:10px; color:var(--text3);
+  border:none; background:transparent;
+  padding:1px 0; margin-top:2px; font-family:inherit;
+}
+.st-inline-note:focus { outline:none; border-bottom:1px solid var(--border2); }
