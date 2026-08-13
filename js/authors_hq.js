@@ -1,4 +1,7 @@
 // authors_hq.js
+let _swipedAuthorId = null;
+let _authorSwipeX = 0;
+
 const AUTHOR_CHECKS = [
   {key:'infoForm',    label:'Info form filled'},
   {key:'multiAuthor', label:'Multi-author story'},
@@ -32,41 +35,148 @@ function renderAuthors() {
     ${asked.map(a=>authorCard(a)).join('')}` : ''}
     ${wish.length ? `<div class="card" style="margin-top:10px">
       <div class="card-title">Wishlist</div>
-      ${wish.map((w,i)=>`<div class="swipe-row" id="wl-${i}">
-        <div class="swipe-content" ontouchstart="swipeStartWL(event,${i})" ontouchend="swipeEndWL(event,${i})">
-          <div style="padding:8px 10px;background:var(--bg);border-radius:var(--radius-sm)">
-            <div style="font-size:13px;font-weight:500">${escHtml(w.name)}</div>
-            ${w.note?`<div style="font-size:11px;color:var(--text2)">${escHtml(w.note)}</div>`:''}
+      ${wish.map((w,i)=>{
+        const wid = 'wl-'+i;
+        const isWishOpen = _swipedAuthorId === wid;
+        return `<div class="author-swipe-row${isWishOpen?' open':''}" id="arow-${wid}" style="margin-bottom:4px">
+          <div class="author-swipe-content"
+            ontouchstart="_authorSwipeX=event.touches[0].clientX"
+            ontouchend="authorSwipeEnd(event,'${wid}')">
+            <div style="padding:8px 10px;background:var(--bg);border:.5px solid var(--border);border-radius:var(--radius-sm)">
+              <div style="font-size:13px;font-weight:500">${escHtml(w.name)}</div>
+              ${w.note?`<div style="font-size:11px;color:var(--text2)">${escHtml(w.note)}</div>`:''}
+            </div>
           </div>
-        </div>
-        <div class="swipe-delete" onclick="deleteWishlist(${i})"><i class="ti ti-trash"></i></div>
-      </div>`).join('')}
+          <div class="author-swipe-actions">
+            <button class="author-action" style="background:var(--green)"
+              onclick="promptAddToYear(${i})">
+              <i class="ti ti-user-plus"></i><span>Add to 2027</span>
+            </button>
+            <button class="author-action" style="background:var(--red)"
+              onclick="deleteWishlist(${i})">
+              <i class="ti ti-trash"></i><span>Delete</span>
+            </button>
+          </div>
+        </div>`;
+      }).join('')}
     </div>` : ''}`;
 }
 
-let _swipedWL = null, _swipeWLX = 0;
-function swipeStartWL(e,i){_swipeWLX=e.touches[0].clientX;}
-function swipeEndWL(e,i){if(e.changedTouches[0].clientX-_swipeWLX<-50)_swipedWL=i;else _swipedWL=null;renderAuthors();}
-function deleteWishlist(i){S.wishlist.splice(i,1);saveState();renderAuthors();}
+function deleteWishlist(i){
+  if(!confirm('Remove from wishlist?')) return;
+  S.wishlist.splice(i,1);
+  _swipedAuthorId=null;
+  saveState();renderAuthors();
+}
+
+function authorSwipeEnd(e, id) {
+  const dx = e.changedTouches[0].clientX - _authorSwipeX;
+  if(dx < -50) _swipedAuthorId = id;
+  else if(dx > 20) _swipedAuthorId = null;
+  renderAuthors();
+}
+
+function moveAuthorRole(id, newRole) {
+  const a = (S.authors||[]).find(x=>x.id===id);
+  if(!a) return;
+  a.role = newRole;
+  _swipedAuthorId = null;
+  saveState();
+  syncAuthorToFirebase((S.authors||[]).findIndex(x=>x.id===id));
+  renderAuthors();
+}
+
+function moveAuthorToWishlist(id) {
+  const idx = (S.authors||[]).findIndex(x=>x.id===id);
+  if(idx<0) return;
+  const a = S.authors[idx];
+  if(!confirm(`Move ${a.name} to wishlist?`)) return;
+  S.wishlist = S.wishlist||[];
+  S.wishlist.push({name:a.name, note:a.notes||''});
+  S.authors.splice(idx,1);
+  _swipedAuthorId = null;
+  saveState(); renderAuthors();
+}
+
+function promptAddToYear(wishIdx) {
+  const w = (S.wishlist||[])[wishIdx];
+  if(!w) return;
+  showModal(`
+    <h3>Add ${escHtml(w.name)} to 2027</h3>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:14px">What role will they have?</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn primary" style="justify-content:center;padding:12px" onclick="addWishlistToYear(${wishIdx},'Book Signing')">
+        <i class="ti ti-book"></i> Book Signing
+      </button>
+      <button class="btn primary" style="justify-content:center;padding:12px" onclick="addWishlistToYear(${wishIdx},'Q&A')">
+        <i class="ti ti-microphone"></i> Q&A Panel
+      </button>
+    </div>
+    <div class="m-actions" style="margin-top:10px">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+    </div>`);
+}
+
+async function addWishlistToYear(wishIdx, role) {
+  const w = (S.wishlist||[])[wishIdx];
+  if(!w) return;
+  const a = {
+    id:'a'+S.nextId++, name:w.name, status:'Confirmed', role,
+    notes:w.note||'', website:'', _expanded:false,
+  };
+  AUTHOR_CHECKS.forEach(c => { a[c.key]=false; });
+  S.authors.push(a);
+  S.wishlist.splice(wishIdx,1);
+  _swipedAuthorId = null;
+  saveState();
+  syncAuthorToFirebase(S.authors.length-1);
+  closeModal(); renderAuthors();
+}
 
 function authorCard(a) {
   const idx = (S.authors||[]).findIndex(x=>x.id===a.id);
   const done = AUTHOR_CHECKS.filter(c=>a[c.key]).length;
   const ini  = a.name.split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase();
-  return `<div style="border:.5px solid var(--border);border-radius:var(--radius-sm);margin-bottom:6px;overflow:hidden">
-    <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;background:var(--bg)"
-      onclick="toggleAuthorExpand(${idx})">
-      <div class="avatar">${ini}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:600">${escHtml(a.name)}</div>
-        <div style="font-size:11px;color:var(--text2)">${escHtml(a.role||'Book Signing')} · ${escHtml(a.status)}</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-        <div style="font-size:11px;color:${done===AUTHOR_CHECKS.length?'var(--green)':'var(--text2)'}">${done}/${AUTHOR_CHECKS.length}</div>
-        <i class="ti ti-chevron-${a._expanded?'up':'down'}" style="font-size:12px;color:var(--text3)"></i>
+  const isOpen = _swipedAuthorId === a.id;
+  const isQA   = (a.role||'').includes('Q&A') || a.role==='Both';
+
+  // Swipe actions for confirmed/asked authors
+  const actions = `
+    <button class="author-action" style="background:var(--purple)"
+      onclick="moveAuthorRole('${a.id}','${isQA?'Book Signing':'Q&A'}')">
+      <i class="ti ti-${isQA?'microphone-off':'microphone'}"></i>
+      <span>${isQA?'→ Book Signing':'→ Q&A'}</span>
+    </button>
+    <button class="author-action" style="background:var(--amber)"
+      onclick="moveAuthorToWishlist('${a.id}')">
+      <i class="ti ti-star"></i><span>→ Wishlist</span>
+    </button>
+    <button class="author-action" style="background:var(--red)"
+      onclick="deleteAuthor(${idx})">
+      <i class="ti ti-trash"></i><span>Delete</span>
+    </button>`;
+
+  return `<div class="author-swipe-row${isOpen?' open':''}" id="arow-${a.id}">
+    <div class="author-swipe-content"
+      ontouchstart="_authorSwipeX=event.touches[0].clientX"
+      ontouchend="authorSwipeEnd(event,'${a.id}')">
+      <div style="border:.5px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;background:var(--bg)">
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer"
+          onclick="toggleAuthorExpand(${idx})">
+          <div class="avatar">${ini}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600">${escHtml(a.name)}</div>
+            <div style="font-size:11px;color:var(--text2)">${escHtml(a.role||'Book Signing')} · ${escHtml(a.status)}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+            <div style="font-size:11px;color:${done===AUTHOR_CHECKS.length?'var(--green)':'var(--text2)'}">${done}/${AUTHOR_CHECKS.length}</div>
+            <i class="ti ti-chevron-${a._expanded?'up':'down'}" style="font-size:12px;color:var(--text3)"></i>
+          </div>
+        </div>
+        ${a._expanded ? authorDetail(a, idx) : ''}
       </div>
     </div>
-    ${a._expanded ? authorDetail(a, idx) : ''}
+    <div class="author-swipe-actions">${actions}</div>
   </div>`;
 }
 
