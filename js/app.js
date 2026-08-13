@@ -49,7 +49,21 @@ function showTab(t) {
   if (t==='finances')     renderFinances();
   if (t==='todo')         renderTodo();
   if (t==='inventory')    renderInventory();
-  if (t==='authors-hq')   renderAuthors();
+  if (t==='authors-hq') {
+    renderAuthors();
+    // Also try to restore from Firebase if local authors empty
+    if (window.FIREBASE_DB_URL && (!S.authors || S.authors.length === 0)) {
+      fetch(window.FIREBASE_DB_URL + '/authors.json')
+        .then(r => r.json())
+        .then(data => {
+          if (data) {
+            S.authors = Object.values(data).filter(a => a && a.name);
+            saveState();
+            renderAuthors();
+          }
+        }).catch(()=>{});
+    }
+  }
   if (t==='prizes-embed') renderPrizesTab();
   if (t==='settings')     renderSettings();
 }

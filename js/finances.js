@@ -271,7 +271,7 @@ function expRow(e,i,paying) {
     ? moneyInExp('ef'+i, e.fixedAmt, i, 'fixedAmt', 'width:70px;font-size:11px;text-align:right')
     : e.type==='perunit'
     ? moneyInExp('eu'+i, e.unitPrice, i, 'unitPrice', 'width:70px;font-size:11px;text-align:right')
-    : `<span style="font-size:11px;color:var(--text3)">—</span>`;
+    : `<a href="#st-${e.subtable}" style="font-size:10px;color:var(--purple);text-decoration:none;padding:2px 6px;border:0.5px solid var(--purple);border-radius:10px">↓ Go</a>`;
 
   const qtyCell = e.type==='perunit'
     ? numInExp('eq'+i, e.qty, i, 'qty', 'width:44px;font-size:11px;text-align:right')

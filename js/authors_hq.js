@@ -16,6 +16,7 @@ const AUTHOR_CHECKS = [
 function renderAuthors() {
   const el = document.getElementById('authors-content');
   if (!el) return;
+  try {
   const all = S.authors || [];
   const alpha = arr => [...arr].sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   const qna   = alpha(all.filter(a => (a.role==='Q&A'||a.role==='Both') && a.status==='Confirmed'));
@@ -133,6 +134,14 @@ async function addWishlistToYear(wishIdx, role) {
   syncAuthorToFirebase(S.authors.length-1);
   closeModal(); renderAuthors();
 }
+
+  } catch(err) {
+    console.error('renderAuthors error:', err);
+    if(el) el.innerHTML = `<div style="padding:20px;color:var(--red);font-size:13px">
+      Error loading authors: ${err.message}<br><br>
+      <button class="btn primary" onclick="renderAuthors()">Retry</button>
+    </div>`;
+  }
 
 function authorCard(a) {
   const idx = (S.authors||[]).findIndex(x=>x.id===a.id);
