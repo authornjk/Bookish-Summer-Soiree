@@ -167,11 +167,15 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--purple)}
 .author-swipe-row { position:relative; overflow:hidden; margin-bottom:6px; }
 .author-swipe-content { transition:transform .25s ease; }
 .author-swipe-row.open .author-swipe-content { transform:translateX(-180px); }
-.author-swipe-actions { position:absolute; right:0; top:0; bottom:0; width:180px; display:flex; }
+.author-swipe-actions { position:absolute; right:-180px; top:0; bottom:0; width:180px; display:flex; transition:right .25s ease; }
+.author-swipe-row.open .author-swipe-actions { right:0; }
 .author-action { flex:1; border:none; color:white; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-size:9px; font-weight:600; cursor:pointer; padding:4px 2px; }
 .author-action i { font-size:15px; }
 .author-action span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
 
 /* Fix expense swipe — hide actions until swiped */
-.exp-swipe-actions { position:absolute; right:0; top:0; bottom:0; width:130px; display:flex; border-radius:0 var(--radius-sm) var(--radius-sm) 0; overflow:hidden; pointer-events:none; opacity:0; transition:opacity .2s; }
-.exp-swipe-row.open .exp-swipe-actions { pointer-events:all; opacity:1; }
+.exp-swipe-actions { position:absolute; right:0; top:0; bottom:0; width:130px; display:flex; border-radius:0 var(--radius-sm) var(--radius-sm) 0; overflow:hidden; transform:translateX(130px); transition:transform .2s ease; z-index:0; }
+.exp-swipe-row.open .exp-swipe-actions { transform:translateX(0); }
+
+.sort-btn{padding:4px 9px;border-radius:var(--radius-sm);border:.5px solid var(--border);background:var(--bg);color:var(--text2);font-size:11px;cursor:pointer}
+.sort-btn.active{color:var(--text);font-weight:600;border-color:var(--border2);background:var(--bg2)}

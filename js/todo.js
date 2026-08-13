@@ -2,6 +2,7 @@
 
 let _todoFilter = '';
 let _todoWho = '';
+let _todoSort = 'default'; // 'default','item','who'
 let _swipedTodoId = null;
 
 function renderTodo() {
@@ -16,6 +17,8 @@ function renderTodo() {
 
   const done  = (S.todos||[]).filter(t=>t.done).length;
   const total = (S.todos||[]).length;
+  if (_todoSort==='item') list = [...list].sort((a,b)=>(a.task||'').localeCompare(b.task||''));
+  if (_todoSort==='who')  list = [...list].sort((a,b)=>(a.who||'').localeCompare(b.who||''));
 
   el.innerHTML = `
     <div class="card" style="margin-bottom:10px">
@@ -31,6 +34,12 @@ function renderTodo() {
       </div>
     </div>
 
+    <div style="display:flex;gap:6px;margin-bottom:8px;align-items:center">
+      <span style="font-size:11px;color:var(--text2)">Sort:</span>
+      <button class="sort-btn${_todoSort==='default'?' active':''}" onclick="_todoSort='default';renderTodo()">Default</button>
+      <button class="sort-btn${_todoSort==='item'?' active':''}" onclick="_todoSort='item';renderTodo()">A–Z</button>
+      <button class="sort-btn${_todoSort==='who'?' active':''}" onclick="_todoSort='who';renderTodo()">By person</button>
+    </div>
     <div class="filter-bar">
       <select onchange="_todoFilter=this.value;renderTodo()">
         <option value="">All tasks</option>

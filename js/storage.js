@@ -19,6 +19,21 @@ function migrateState() {
   if (!S.authors)          S.authors          = JSON.parse(JSON.stringify(DEFAULT_DATA.authors));
   if (!S.wishlist)         S.wishlist         = JSON.parse(JSON.stringify(DEFAULT_DATA.wishlist));
   if (!S.people)           S.people           = JSON.parse(JSON.stringify(DEFAULT_DATA.people));
+  if (!S.peopleGroups)     S.peopleGroups     = JSON.parse(JSON.stringify(DEFAULT_DATA.peopleGroups));
+  // Add cat field to inventory items missing it
+  if (S.inventory) {
+    const catMap = {'Backdrops':'Backdrops','Check-in':'Check-in','Decor:':'Decor',
+      'Prizes:':'Prize table','Misc:':'Misc','Bible':'Misc','Name tags':'Check-in',
+      'Raffle':'Prize table','Water bottle':'Misc','Extra':'Misc','Friendship':'Misc','Sign ':'Misc'};
+    S.inventory = S.inventory.map(item => {
+      if (item.cat) return item;
+      let cat = 'Misc';
+      for (const [key, val] of Object.entries(catMap)) {
+        if ((item.item||'').includes(key)) { cat=val; break; }
+      }
+      return {...item, cat};
+    });
+  }
   if (!S.customLocations)  S.customLocations  = [];
   if (!S.nextId)           S.nextId           = 200;
   if (!S.eventName)        S.eventName        = DEFAULT_DATA.eventName;

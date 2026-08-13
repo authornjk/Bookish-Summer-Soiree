@@ -17,10 +17,11 @@ function renderAuthors() {
   const el = document.getElementById('authors-content');
   if (!el) return;
   const all = S.authors || [];
-  const qna  = all.filter(a => a.role==='Q&A' && a.status==='Confirmed');
-  const conf = all.filter(a => a.role!=='Q&A' && a.status==='Confirmed');
-  const asked = all.filter(a => a.status==='Asked'||a.status==='Maybe');
-  const wish  = S.wishlist || [];
+  const alpha = arr => [...arr].sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const qna   = alpha(all.filter(a => (a.role==='Q&A'||a.role==='Both') && a.status==='Confirmed'));
+  const conf  = alpha(all.filter(a => a.role!=='Q&A' && a.role!=='Both' && a.status==='Confirmed'));
+  const asked = alpha(all.filter(a => a.status==='Asked'||a.status==='Maybe'));
+  const wish  = alpha(S.wishlist || []);
 
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">

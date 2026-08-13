@@ -1,3 +1,8 @@
+// Shared swipe state
+if(typeof _authorSwipeX === "undefined") var _authorSwipeX = 0;
+let _swipedExpIdx = null;
+let _expSwipeX = 0;
+
 // finances.js — full expense calculator with merch toggle and swipe-to-delete
 
 function tipAmt(tip, base) {

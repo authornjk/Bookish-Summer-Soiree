@@ -81,14 +81,23 @@ async function renderSettings() {
     </div>
     <div class="card">
       <div class="card-title">People</div>
-      <div id="people-list" style="display:flex;flex-direction:column;gap:5px;margin-bottom:8px">
-        ${(S.people||[]).map((p,i)=>`<div style="display:flex;align-items:center;gap:5px">
-          <input type="text" value="${escHtml(p)}" style="flex:1;font-size:13px;padding:5px 8px"
-            onblur="S.people[${i}]=this.value;saveState()">
-          <button class="btn danger" style="padding:4px 8px" onclick="S.people.splice(${i},1);saveState();renderSettings()"><i class="ti ti-x"></i></button>
-        </div>`).join('')}
-      </div>
-      <button class="btn" onclick="S.people.push('New person');saveState();renderSettings()"><i class="ti ti-plus"></i> Add person</button>
+      ${['Admin','Set-up','Misc'].map(grp => {
+        const groups = S.peopleGroups || {};
+        const members = groups[grp] || [];
+        return `<div style="margin-bottom:12px">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);margin-bottom:5px">${grp}</div>
+          <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:4px">
+            ${members.map((p,i) => `<div style="display:flex;align-items:center;gap:5px">
+              <input type="text" value="${escHtml(p)}" style="flex:1;font-size:13px;padding:5px 8px"
+                onblur="updatePersonInGroup('${grp}',${i},this.value)">
+              <button class="btn danger" style="padding:4px 8px" onclick="removePersonFromGroup('${grp}',${i})"><i class="ti ti-x"></i></button>
+            </div>`).join('')}
+          </div>
+          <button class="btn" style="font-size:11px;padding:3px 9px" onclick="addPersonToGroup('${grp}')">
+            <i class="ti ti-plus"></i> Add to ${grp}
+          </button>
+        </div>`;
+      }).join('')}
     </div>`;
 }
 
@@ -122,6 +131,28 @@ function renderPrizesTab() {
     <iframe id="prize-frame" src="${escHtml(url)}"
       style="width:100%;height:calc(100vh - 180px);min-height:500px;border:.5px solid var(--border);border-radius:var(--radius-md);background:var(--bg)"
       title="Prize Manager"></iframe>`;
+}
+
+function updatePersonInGroup(grp, i, val) {
+  if (!S.peopleGroups) S.peopleGroups = {};
+  if (!S.peopleGroups[grp]) S.peopleGroups[grp] = [];
+  S.peopleGroups[grp][i] = val;
+  // Keep flat people array in sync
+  S.people = [...new Set(Object.values(S.peopleGroups).flat())];
+  saveState();
+}
+function removePersonFromGroup(grp, i) {
+  if (!S.peopleGroups?.[grp]) return;
+  S.peopleGroups[grp].splice(i, 1);
+  S.people = [...new Set(Object.values(S.peopleGroups).flat())];
+  saveState(); renderSettings();
+}
+function addPersonToGroup(grp) {
+  if (!S.peopleGroups) S.peopleGroups = {};
+  if (!S.peopleGroups[grp]) S.peopleGroups[grp] = [];
+  S.peopleGroups[grp].push('New person');
+  S.people = [...new Set(Object.values(S.peopleGroups).flat())];
+  saveState(); renderSettings();
 }
 
 function boot() {
