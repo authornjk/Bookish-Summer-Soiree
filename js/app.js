@@ -169,6 +169,14 @@ function addPersonToGroup(grp) {
   saveState(); renderSettings();
 }
 
+function resetAuthors() {
+  S.authors = JSON.parse(JSON.stringify(DEFAULT_DATA.authors));
+  S.wishlist = JSON.parse(JSON.stringify(DEFAULT_DATA.wishlist));
+  saveState();
+  showToast('Authors restored!');
+  renderSettings();
+}
+
 function boot() {
   window.FIREBASE_DB_URL = localStorage.getItem('soiree_firebase_url') || '';
   window.PRIZE_APP_URL   = localStorage.getItem('soiree_prize_url')   || '';
