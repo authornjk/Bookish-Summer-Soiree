@@ -54,10 +54,10 @@ function renderAuthors() {
   let html = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
       <div>
-        <div style="font-size:13px;font-weight:600">${all.filter(a=>a.status==='Confirmed').length} confirmed · ${all.length} total authors</div>
+        <div style="font-size:13px;font-weight:600">${all.filter(a=>a.status==='Confirmed').length} confirmed · ${all.length} total authors · ${Math.max(0,TOTAL_GOAL-all.filter(a=>a.status==='Confirmed').length)} still needed</div>
         <div style="font-size:11px;color:var(--text2);margin-top:2px">
-          Q&amp;A: ${qnaConfirmed.length} confirmed, ${qnaAsked.length} asked, ${qnaNeeded} needed &nbsp;·&nbsp;
-          Book Signing: ${sigConf.length} confirmed, ${sigAsked.length} asked, ${sigNeeded} needed
+          Q&amp;A: ${qnaConfirmed.length} confirmed, ${qnaNeeded} needed, ${qnaAsked.length} asked &nbsp;·&nbsp;
+          Book Signing: ${sigConf.length} confirmed, ${sigNeeded} needed, ${sigAsked.length} asked
         </div>
       </div>
       <button class="btn primary" onclick="openAddAuthorModal()"><i class="ti ti-user-plus"></i> Add author</button>
