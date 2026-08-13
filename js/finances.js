@@ -303,6 +303,11 @@ function expRow(e,i,paying) {
       <button class="exp-action-edit" onclick="openEditExpense(${i})"><i class="ti ti-pencil"></i><span>Edit</span></button>
       <button class="exp-action-delete" onclick="deleteExp(${i})"><i class="ti ti-trash"></i><span>Delete</span></button>
     </div>
+    <!-- Always-visible action buttons for non-touch -->
+    <div class="exp-desktop-actions">
+      <button class="icon-btn" onclick="openEditExpense(${i})" title="Edit"><i class="ti ti-pencil"></i></button>
+      <button class="icon-btn del-btn" onclick="if(confirm('Delete this line?'))deleteExp(${i})" title="Delete"><i class="ti ti-trash"></i></button>
+    </div>
   </div>`;
 }
 
@@ -324,9 +329,14 @@ function stPriceQty(key, title) {
         ontouchend="stSwipeEnd(event,'${key}',${i})">
         <div style="background:var(--bg);border:.5px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px">
           <div style="display:grid;grid-template-columns:1fr 72px 52px 60px;gap:6px;align-items:center">
-            <input type="text" class="st-inline-name" value="${escHtml(r.label||r.size||'')}" placeholder="Size/style"
-              onblur="if(S.${key}&&S.${key}[${i}]){S.${key}[${i}].label=this.value;S.${key}[${i}].size=this.value;}saveState()"
-              onkeydown="if(event.key==='Enter')this.blur()">
+            <div style="display:flex;align-items:center;gap:4px">
+              <input type="text" class="st-inline-name" value="${escHtml(r.label||r.size||'')}" placeholder="Size/style"
+                onblur="if(S.${key}&&S.${key}[${i}]){S.${key}[${i}].label=this.value;S.${key}[${i}].size=this.value;}saveState()"
+                onkeydown="if(event.key==='Enter')this.blur()">
+              <button class="icon-btn del-btn" onclick="if(confirm('Delete this item?'))delStRow('${key}',${i})" style="flex-shrink:0" title="Delete">
+                <i class="ti ti-trash"></i>
+              </button>
+            </div>
             ${moneyInSt('st'+key+i+'p', r.price, key, i, 'price', 'width:100%;font-size:12px')}
             ${numInSt('st'+key+i+'q', r.qty, key, i, 'qty', 'width:100%;font-size:12px;text-align:right')}
             <span style="font-size:12px;font-weight:600;text-align:right">${fmt((+r.price||0)*(+r.qty||0))}</span>
@@ -383,9 +393,14 @@ function stEstSpent(key, title) {
         <div style="background:var(--bg);border:.5px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px">
           <div style="display:flex;gap:8px;align-items:flex-start">
             <div style="flex:1;min-width:0">
-              <input type="text" class="st-inline-name" value="${escHtml(r.label||'')}" placeholder="Item name"
-                onblur="if(S.${key}&&S.${key}[${i}])S.${key}[${i}].label=this.value;saveState()"
-                onkeydown="if(event.key==='Enter')this.blur()">
+              <div style="display:flex;align-items:center;gap:4px">
+                <input type="text" class="st-inline-name" value="${escHtml(r.label||'')}" placeholder="Item name"
+                  onblur="if(S.${key}&&S.${key}[${i}])S.${key}[${i}].label=this.value;saveState()"
+                  onkeydown="if(event.key==='Enter')this.blur()">
+                <button class="icon-btn del-btn" onclick="if(confirm('Delete this item?'))delStRow('${key}',${i})" style="flex-shrink:0" title="Delete">
+                  <i class="ti ti-trash"></i>
+                </button>
+              </div>
               <input type="text" class="st-inline-note" value="${escHtml(r.notes||'')}" placeholder="Notes…"
                 onblur="if(S.${key}&&S.${key}[${i}])S.${key}[${i}].notes=this.value;saveState()"
                 onkeydown="if(event.key==='Enter')this.blur()">
