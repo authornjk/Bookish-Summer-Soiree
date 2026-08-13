@@ -121,10 +121,21 @@ function renderSettings() {
     <!-- AUTHOR DATA -->
     <div class="card">
       <div class="card-title">Author data</div>
-      <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Restore authors and wishlist from defaults if they've been lost.</p>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn primary" onclick="resetAuthors()"><i class="ti ti-refresh"></i> Restore defaults</button>
-        <button class="btn" onclick="restoreAuthorsFromFirebase()"><i class="ti ti-cloud-download"></i> Restore from Firebase</button>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="background:var(--bg2);border-radius:var(--radius-sm);padding:10px">
+          <div style="font-size:12px;font-weight:600;margin-bottom:3px">Restore defaults</div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:7px">Resets authors and wishlist to the built-in starting list. <strong>Your changes will be overwritten.</strong> Only use if data is completely gone.</div>
+          <button class="btn" onclick="confirmDelete('This will overwrite your current author list and wishlist with the built-in defaults. Continue?',()=>resetAuthors())">
+            <i class="ti ti-refresh"></i> Restore defaults
+          </button>
+        </div>
+        <div style="background:var(--bg2);border-radius:var(--radius-sm);padding:10px">
+          <div style="font-size:12px;font-weight:600;margin-bottom:3px">Restore from Firebase</div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:7px">Pulls your author list from Firebase (the cloud backup). Use this if you've entered authors before and they disappeared. <strong>Does not overwrite if Firebase is empty.</strong></div>
+          <button class="btn primary" onclick="restoreAuthorsFromFirebase()">
+            <i class="ti ti-cloud-download"></i> Restore from Firebase
+          </button>
+        </div>
       </div>
     </div>
 
