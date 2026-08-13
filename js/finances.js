@@ -109,7 +109,11 @@ function blurNumSt(el,key,i,field) {
 function renderFinances() {
   const el=document.getElementById('tab-finances');
   if(!el) return;
-  try {
+  // Safe defaults in case S is partially broken
+  if(!S.attendance) S.attendance={total:175,authors:18,admin:4};
+  if(!S.expenses) S.expenses=[];
+  if(S.ticketPrice===undefined) S.ticketPrice=0;
+  if(S.merchType===undefined) S.merchType='hats';
   const {paying,totalEst,totalSpent,autoTicket}=calcTotals();
   const {total,authors,admin}=S.attendance;
   const setTicket=+(S.ticketPrice||0);
@@ -161,10 +165,10 @@ function renderFinances() {
   <div class="card" style="padding:10px 14px">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <span style="font-size:13px;font-weight:500">Merch this year:</span>
-      <button class="btn${S.merchType==='hats'?' purple':''}" onclick="S.merchType='hats';saveState();renderFinances()">
+      <button class="btn" id="merch-hats" style="${S.merchType==='hats'?'background:var(--purple-bg);color:var(--purple-text);border-color:var(--purple)':''}" onclick="S.merchType='hats';saveState();renderFinances()">
         <i class="ti ti-cap"></i> Hats
       </button>
-      <button class="btn${S.merchType==='tshirts'?' purple':''}" onclick="S.merchType='tshirts';saveState();renderFinances()">
+      <button class="btn" id="merch-shirts" style="${S.merchType==='tshirts'?'background:var(--purple-bg);color:var(--purple-text);border-color:var(--purple)':''}" onclick="S.merchType='tshirts';saveState();renderFinances()">
         <i class="ti ti-shirt"></i> T-shirts
       </button>
       <span style="font-size:11px;color:var(--text2)">Only the selected type feeds into the budget</span>
@@ -229,10 +233,6 @@ function renderFinances() {
   ${stEstSpent('decorations','Decorations')}
   ${stEstSpent('misc','Misc expenses',true)}
   `;
-  } catch(err) {
-    console.error('renderFinances error:', err);
-    if(el) el.innerHTML = `<div class="card" style="margin:20px"><div class="card-title">Error</div><p style="font-size:12px;color:var(--red);padding:8px">${err.message}</p></div>`;
-  }
 }
 function expRow(e,i,paying) {
   // Skip inactive merch lines

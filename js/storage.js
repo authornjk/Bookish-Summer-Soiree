@@ -112,9 +112,19 @@ function migrateState() {
     S.inventory = JSON.parse(JSON.stringify(DEFAULT_DATA.inventory));
   }
 
-  // Authors — preserve entirely, just add if missing
-  if (!S.authors  || S.authors.length  === 0) S.authors  = JSON.parse(JSON.stringify(DEFAULT_DATA.authors));
-  if (!S.wishlist || S.wishlist.length  === 0) S.wishlist = JSON.parse(JSON.stringify(DEFAULT_DATA.wishlist));
+  // Authors + wishlist — preserve user data, restore from defaults only if completely empty
+  if (!S.authors  || S.authors.length  === 0) {
+    S.authors  = JSON.parse(JSON.stringify(DEFAULT_DATA.authors));
+  }
+  if (!S.wishlist || S.wishlist.length  === 0) {
+    S.wishlist = JSON.parse(JSON.stringify(DEFAULT_DATA.wishlist));
+  }
+  // Ensure all author records have required fields
+  S.authors = S.authors.map(a => ({
+    infoForm:false, multiAuthor:false, swagSent:false, booksDonated:false,
+    ticket:false, qrCode:false, signingConfirmed:false, thankYou:false,
+    notes:'', website:'', _expanded:false, ...a
+  }));
 
   // Todos — preserve, just add if missing
   if (!S.todos || S.todos.length === 0) S.todos = JSON.parse(JSON.stringify(DEFAULT_DATA.todos));
