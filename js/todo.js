@@ -1,89 +1,141 @@
+// todo.js — with swipe-to-delete and tap-name-to-reassign
+
+let _todoFilter = '';
+let _todoWho = '';
+let _swipedTodoId = null;
+
 function renderTodo() {
   const el = document.getElementById('tab-todo');
   if (!el) return;
 
-  const q = (document.getElementById('td-search') || {}).value?.toLowerCase() || '';
-  const who = (document.getElementById('td-who') || {}).value || '';
-  const status = (document.getElementById('td-status') || {}).value || '';
+  const people = S.people || [];
+  let list = S.todos || [];
+  if (_todoWho) list = list.filter(t => t.who === _todoWho);
+  if (_todoFilter === 'done')   list = list.filter(t => t.done);
+  if (_todoFilter === 'undone') list = list.filter(t => !t.done);
 
-  const done = S.todos.filter(t => t.done).length;
-  const total = S.todos.length;
-  const people = [...new Set(S.todos.map(t => t.who).filter(Boolean))].sort();
-
-  const filtered = S.todos.filter(t => {
-    const mq = !q || t.task.toLowerCase().includes(q) || (t.who || '').toLowerCase().includes(q);
-    const mw = !who || t.who === who;
-    const ms = !status || (status === 'done' ? t.done : !t.done);
-    return mq && mw && ms;
-  });
+  const done  = (S.todos||[]).filter(t=>t.done).length;
+  const total = (S.todos||[]).length;
 
   el.innerHTML = `
-    <div class="stat-grid">
-      <div class="stat"><div class="stat-lbl">Total tasks</div><div class="stat-val">${total}</div></div>
-      <div class="stat"><div class="stat-lbl">Done</div><div class="stat-val" style="color:var(--green)">${done}</div></div>
-      <div class="stat"><div class="stat-lbl">Remaining</div><div class="stat-val" style="color:var(--red)">${total - done}</div></div>
-      <div class="stat">
-        <div class="stat-lbl">Progress</div>
-        <div class="stat-val">${pctStr(done, total)}</div>
-        <div class="prog-bar"><div class="prog-fill" style="width:${pctStr(done, total)}"></div></div>
+    <div class="card" style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-size:18px;font-weight:700">${done}/${total}</div>
+          <div style="font-size:11px;color:var(--text2)">tasks complete</div>
+          <div style="margin-top:6px;height:6px;background:var(--border);border-radius:3px;width:180px;overflow:hidden">
+            <div style="height:100%;background:var(--purple);width:${total>0?Math.round(done/total*100):0}%;border-radius:3px"></div>
+          </div>
+        </div>
+        <button class="btn primary" onclick="openAddTodoModal()"><i class="ti ti-plus"></i> Add task</button>
       </div>
     </div>
 
-    <div class="filter-row">
-      <input type="text" id="td-search" placeholder="Search tasks…" value="${escHtml(q)}" oninput="renderTodo()">
-      <select id="td-who" onchange="renderTodo()">
-        <option value="">All people</option>
-        ${people.map(p => `<option${p === who ? ' selected' : ''}>${escHtml(p)}</option>`).join('')}
+    <div class="filter-bar">
+      <select onchange="_todoFilter=this.value;renderTodo()">
+        <option value="">All tasks</option>
+        <option value="undone"${_todoFilter==='undone'?' selected':''}>Not done</option>
+        <option value="done"${_todoFilter==='done'?' selected':''}>Done</option>
       </select>
-      <select id="td-status" onchange="renderTodo()">
-        <option value="">All</option>
-        <option value="todo"${status === 'todo' ? ' selected' : ''}>To do</option>
-        <option value="done"${status === 'done' ? ' selected' : ''}>Done</option>
+      <select onchange="_todoWho=this.value;renderTodo()">
+        <option value="">Everyone</option>
+        ${people.map(p=>`<option value="${escHtml(p)}"${_todoWho===p?' selected':''}>${escHtml(p)}</option>`).join('')}
       </select>
-      <button class="btn primary" onclick="openAddTodo()"><i class="ti ti-plus"></i> Add task</button>
     </div>
 
-    <div id="td-list">
-      ${filtered.length ? filtered.map(t => `
-        <div class="todo-item ${t.done ? 'done-item' : ''}">
-          <input type="checkbox" class="todo-cb" ${t.done ? 'checked' : ''} onchange="toggleTodo(${t.id},this.checked)">
-          <span class="todo-text ${t.done ? 'struck' : ''}">${escHtml(t.task)}</span>
-          ${t.who ? `<span class="who-pill">${escHtml(t.who)}</span>` : ''}
-          <button class="btn" onclick="deleteTodo(${t.id})" style="padding:2px 6px;color:var(--text3)"><i class="ti ti-x"></i></button>
-        </div>`).join('') : `<div class="empty"><i class="ti ti-check"></i><span>No tasks match your filters</span></div>`}
+    <div id="todo-list" style="display:flex;flex-direction:column;gap:5px">
+      ${list.map(t => todoRowHTML(t)).join('')}
     </div>`;
 }
 
+function todoRowHTML(t) {
+  const isOpen = _swipedTodoId === t.id;
+  return `<div class="swipe-row${isOpen?' open':''}" id="todo-row-${t.id}">
+    <div class="swipe-content" 
+      ontouchstart="swipeStart(event,'todo',${t.id})"
+      ontouchend="swipeEnd(event,'todo',${t.id})">
+      <div style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--bg);border-radius:var(--radius-sm)">
+        <input type="checkbox" ${t.done?'checked':''} style="width:16px;height:16px;accent-color:var(--purple);flex-shrink:0"
+          onchange="toggleTodo(${t.id},this.checked)">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;${t.done?'text-decoration:line-through;color:var(--text3)':''}">${escHtml(t.task)}</div>
+          ${t.who?`<div class="who-badge" onclick="cycleTodoWho(${t.id},event)">${escHtml(t.who)} <i class="ti ti-chevron-down" style="font-size:9px"></i></div>`
+                 :`<div class="who-badge unassigned" onclick="cycleTodoWho(${t.id},event)">Unassigned <i class="ti ti-chevron-down" style="font-size:9px"></i></div>`}
+        </div>
+      </div>
+    </div>
+    <div class="swipe-delete" onclick="deleteTodo(${t.id})">
+      <i class="ti ti-trash"></i> Delete
+    </div>
+  </div>`;
+}
+
 function toggleTodo(id, val) {
-  const t = S.todos.find(x => x.id === id);
+  const t = (S.todos||[]).find(t=>t.id===id);
   if (t) { t.done = val; saveState(); renderTodo(); }
+}
+
+function cycleTodoWho(id, e) {
+  e.stopPropagation();
+  const t = (S.todos||[]).find(t=>t.id===id);
+  if (!t) return;
+  const people = ['', ...(S.people||[])];
+  const idx = people.indexOf(t.who||'');
+  t.who = people[(idx+1) % people.length];
+  saveState(); renderTodo();
 }
 
 function deleteTodo(id) {
   if (!confirm('Delete this task?')) return;
-  S.todos = S.todos.filter(x => x.id !== id);
+  S.todos = (S.todos||[]).filter(t=>t.id!==id);
+  _swipedTodoId = null;
   saveState(); renderTodo();
 }
 
-function openAddTodo() {
-  const people = [...new Set(S.todos.map(t => t.who).filter(Boolean))].sort();
+function openAddTodoModal() {
+  const people = S.people || [];
   showModal(`
     <h3>Add task</h3>
-    <div class="field"><label>Task description</label><input type="text" id="at-task" placeholder="What needs to be done?"></div>
+    <div class="field"><label>Task description</label>
+      <textarea id="at-task" rows="2" placeholder="What needs to be done?"></textarea>
+    </div>
     <div class="field"><label>Assigned to</label>
-      <input type="text" id="at-who" list="at-who-list" placeholder="Name (optional)">
-      <datalist id="at-who-list">${people.map(p => `<option value="${escHtml(p)}">`).join('')}</datalist>
+      <select id="at-who">
+        <option value="">Unassigned</option>
+        ${people.map(p=>`<option>${escHtml(p)}</option>`).join('')}
+      </select>
     </div>
     <div class="m-actions">
       <button class="btn" onclick="closeModal()">Cancel</button>
       <button class="btn primary" onclick="doAddTodo()"><i class="ti ti-plus"></i> Add</button>
     </div>`);
-  setTimeout(() => document.getElementById('at-task')?.focus(), 50);
+  setTimeout(()=>document.getElementById('at-task')?.focus(),50);
 }
 
 function doAddTodo() {
   const task = document.getElementById('at-task')?.value?.trim();
-  if (!task) { alert('Please enter a task description.'); return; }
-  S.todos.push({ id: S.nextId++, who: document.getElementById('at-who')?.value?.trim() || '', task, done: false });
+  if (!task) { alert('Please enter a task.'); return; }
+  const todo = {
+    id: S.nextId++,
+    task,
+    who: document.getElementById('at-who')?.value || '',
+    done: false
+  };
+  S.todos.push(todo);
   saveState(); closeModal(); renderTodo();
+}
+
+// ── Swipe to delete ───────────────────────────────────────────────────────────
+let _swipeStartX = 0;
+function swipeStart(e, type, id) {
+  _swipeStartX = e.touches[0].clientX;
+}
+function swipeEnd(e, type, id) {
+  const dx = e.changedTouches[0].clientX - _swipeStartX;
+  if (dx < -50) {
+    _swipedTodoId = id;
+  } else if (dx > 20) {
+    _swipedTodoId = null;
+  }
+  renderTodo();
 }
