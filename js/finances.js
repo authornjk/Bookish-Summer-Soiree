@@ -171,20 +171,6 @@ function renderFinances() {
     </div>
   </div>
 
-  <!-- Merch toggle -->
-  <div class="card" style="padding:10px 14px">
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-      <span style="font-size:13px;font-weight:500">Merch this year:</span>
-      <button class="btn" id="merch-hats" style="${S.merchType==='hats'?'background:var(--purple-bg);color:var(--purple-text);border-color:var(--purple)':''}" onclick="S.merchType='hats';saveState();renderFinances()">
-        <i class="ti ti-cap"></i> Hats
-      </button>
-      <button class="btn" id="merch-shirts" style="${S.merchType==='tshirts'?'background:var(--purple-bg);color:var(--purple-text);border-color:var(--purple)':''}" onclick="S.merchType='tshirts';saveState();renderFinances()">
-        <i class="ti ti-shirt"></i> T-shirts
-      </button>
-      <span style="font-size:11px;color:var(--text2)">Only the selected type feeds into the budget</span>
-    </div>
-  </div>
-
   <!-- Jump nav -->
   <div class="jump-nav">
     <span class="jump-lbl">Jump to:</span>
