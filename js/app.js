@@ -98,13 +98,16 @@ async function renderSettings() {
       ${['Admin','Set-up','Misc'].map(grp => {
         const groups = S.peopleGroups || {};
         const members = groups[grp] || [];
-        return `<div style="margin-bottom:12px">
-          <div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);margin-bottom:5px">${grp}</div>
-          <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:4px">
-            ${members.map((p,i) => `<div style="display:flex;align-items:center;gap:5px">
-              <input type="text" value="${escHtml(p)}" style="flex:1;font-size:13px;padding:5px 8px"
+        return `<div style="margin-bottom:14px">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);margin-bottom:6px">${grp}</div>
+          <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px">
+            ${members.map((p,i) => `<div style="display:flex;align-items:center;gap:6px;background:var(--bg);border:.5px solid var(--border);border-radius:var(--radius-sm);padding:6px 10px">
+              <input type="text" value="${escHtml(p)}" style="flex:1;font-size:13px;border:none;background:transparent;color:var(--text);padding:0"
                 onblur="updatePersonInGroup('${grp}',${i},this.value)">
-              <button class="btn danger" style="padding:4px 8px" onclick="removePersonFromGroup('${grp}',${i})"><i class="ti ti-x"></i></button>
+              <button style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:13px;padding:2px 4px" 
+                onclick="if(confirm('Remove ${escHtml(p)} from ${grp}?'))removePersonFromGroup('${grp}',${i})">
+                <i class="ti ti-trash"></i>
+              </button>
             </div>`).join('')}
           </div>
           <button class="btn" style="font-size:11px;padding:3px 9px" onclick="addPersonToGroup('${grp}')">
@@ -112,6 +115,12 @@ async function renderSettings() {
           </button>
         </div>`;
       }).join('')}
+    </div>
+
+    <div class="card">
+      <div class="card-title">Author data</div>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:10px">If authors or wishlist are missing or incorrect, tap this to restore from defaults.</p>
+      <button class="btn primary" onclick="resetAuthors()"><i class="ti ti-refresh"></i> Restore authors &amp; wishlist</button>
     </div>`;
 }
 
