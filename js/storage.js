@@ -22,6 +22,8 @@ function migrateState() {
   if (!S.eventName)                  S.eventName   = D.eventName;
   if (!S.eventYear)                  S.eventYear   = D.eventYear;
   if (S.merchType    === undefined) S.merchType    = D.merchType || 'hats';
+  if (!S.merchOptions) S.merchOptions = ['hats','tshirts'];
+  if (!S.merchLabels)  S.merchLabels  = {hats:'Hats', tshirts:'T-shirts'};
   if (!S._2027reset) {
     // One-time: reset todo done flags for new year
     if (S.todos) S.todos = S.todos.map(t => ({...t, done:false}));
