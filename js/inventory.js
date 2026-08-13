@@ -55,11 +55,11 @@ function renderInventory() {
 
 function invRowHTML(item) {
   const isOpen = _swipedInvId === item.id;
-  return `<div class="swipe-row${isOpen?' open':''}" id="inv-row-${item.id}">
-    <div class="swipe-content"
-      ontouchstart="swipeStartInv(event,${item.id})"
-      ontouchend="swipeEndInv(event,${item.id})">
-      <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg);border-radius:var(--radius-sm)">
+  return `<div class="author-swipe-row${isOpen?' open':''}" id="inv-row-${item.id}">
+    <div class="author-swipe-content"
+      ontouchstart="_authorSwipeX=event.touches[0].clientX"
+      ontouchend="invSwipeEnd(event,${item.id})">
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg);border:.5px solid var(--border);border-radius:var(--radius-sm)">
         <input type="checkbox" ${item.packed?'checked':''} style="width:16px;height:16px;accent-color:var(--green);flex-shrink:0"
           onchange="togglePacked(${item.id},this.checked)">
         <div style="flex:1;min-width:0">
@@ -68,8 +68,10 @@ function invRowHTML(item) {
         </div>
       </div>
     </div>
-    <div class="swipe-delete" onclick="deleteInvItem(${item.id})">
-      <i class="ti ti-trash"></i> Delete
+    <div class="author-swipe-actions" style="width:80px">
+      <button class="author-action" style="background:var(--red)" onclick="deleteInvItem(${item.id})">
+        <i class="ti ti-trash"></i><span>Delete</span>
+      </button>
     </div>
   </div>`;
 }
@@ -144,10 +146,8 @@ function doAddInvItem() {
   saveState(); closeModal(); renderInventory();
 }
 
-let _swipeStartInvX = 0;
-function swipeStartInv(e, id) { _swipeStartInvX = e.touches[0].clientX; }
-function swipeEndInv(e, id) {
-  const dx = e.changedTouches[0].clientX - _swipeStartInvX;
+function invSwipeEnd(e, id) {
+  const dx = e.changedTouches[0].clientX - _authorSwipeX;
   if (dx < -50) _swipedInvId = id;
   else if (dx > 20) _swipedInvId = null;
   renderInventory();

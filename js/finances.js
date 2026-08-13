@@ -104,6 +104,7 @@ function blurNumSt(el,key,i,field) {
 function renderFinances() {
   const el=document.getElementById('tab-finances');
   if(!el) return;
+  try {
   const {paying,totalEst,totalSpent,autoTicket}=calcTotals();
   const {total,authors,admin}=S.attendance;
   const setTicket=+(S.ticketPrice||0);
@@ -223,8 +224,11 @@ function renderFinances() {
   ${stEstSpent('decorations','Decorations')}
   ${stEstSpent('misc','Misc expenses',true)}
   `;
+  } catch(err) {
+    console.error('renderFinances error:', err);
+    if(el) el.innerHTML = `<div class="card" style="margin:20px"><div class="card-title">Error</div><p style="font-size:12px;color:var(--red);padding:8px">${err.message}</p></div>`;
+  }
 }
-
 function expRow(e,i,paying) {
   // Skip inactive merch lines
   if (e.type==='subtable' && e.subtable==='tshirts' && S.merchType!=='tshirts') return '';

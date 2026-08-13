@@ -50,11 +50,11 @@ function renderTodo() {
 
 function todoRowHTML(t) {
   const isOpen = _swipedTodoId === t.id;
-  return `<div class="swipe-row${isOpen?' open':''}" id="todo-row-${t.id}">
-    <div class="swipe-content" 
-      ontouchstart="swipeStart(event,'todo',${t.id})"
-      ontouchend="swipeEnd(event,'todo',${t.id})">
-      <div style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--bg);border-radius:var(--radius-sm)">
+  return `<div class="author-swipe-row${isOpen?' open':''}" id="todo-row-${t.id}">
+    <div class="author-swipe-content"
+      ontouchstart="_authorSwipeX=event.touches[0].clientX"
+      ontouchend="todoSwipeEnd(event,${t.id})">
+      <div style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--bg);border:.5px solid var(--border);border-radius:var(--radius-sm)">
         <input type="checkbox" ${t.done?'checked':''} style="width:16px;height:16px;accent-color:var(--purple);flex-shrink:0"
           onchange="toggleTodo(${t.id},this.checked)">
         <div style="flex:1;min-width:0">
@@ -64,8 +64,10 @@ function todoRowHTML(t) {
         </div>
       </div>
     </div>
-    <div class="swipe-delete" onclick="deleteTodo(${t.id})">
-      <i class="ti ti-trash"></i> Delete
+    <div class="author-swipe-actions" style="width:80px">
+      <button class="author-action" style="background:var(--red)" onclick="deleteTodo(${t.id})">
+        <i class="ti ti-trash"></i><span>Delete</span>
+      </button>
     </div>
   </div>`;
 }
@@ -125,17 +127,9 @@ function doAddTodo() {
   saveState(); closeModal(); renderTodo();
 }
 
-// ── Swipe to delete ───────────────────────────────────────────────────────────
-let _swipeStartX = 0;
-function swipeStart(e, type, id) {
-  _swipeStartX = e.touches[0].clientX;
-}
-function swipeEnd(e, type, id) {
-  const dx = e.changedTouches[0].clientX - _swipeStartX;
-  if (dx < -50) {
-    _swipedTodoId = id;
-  } else if (dx > 20) {
-    _swipedTodoId = null;
-  }
+function todoSwipeEnd(e, id) {
+  const dx = e.changedTouches[0].clientX - _authorSwipeX;
+  if (dx < -50) _swipedTodoId = id;
+  else if (dx > 20) _swipedTodoId = null;
   renderTodo();
 }

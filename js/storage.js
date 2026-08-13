@@ -10,6 +10,11 @@ function migrateState() {
   if (S.ticketPrice === undefined) S.ticketPrice = 0;
   if (!S.expenses)         S.expenses         = JSON.parse(JSON.stringify(DEFAULT_DATA.expenses));
   if (!S.todos)            S.todos            = JSON.parse(JSON.stringify(DEFAULT_DATA.todos));
+  // v2027: reset all todo done status to false for new year
+  if (!S._2027reset) {
+    S.todos = (S.todos||[]).map(t => ({...t, done:false}));
+    S._2027reset = true;
+  }
   if (!S.inventory)        S.inventory        = JSON.parse(JSON.stringify(DEFAULT_DATA.inventory));
   if (!S.authors)          S.authors          = JSON.parse(JSON.stringify(DEFAULT_DATA.authors));
   if (!S.wishlist)         S.wishlist         = JSON.parse(JSON.stringify(DEFAULT_DATA.wishlist));
