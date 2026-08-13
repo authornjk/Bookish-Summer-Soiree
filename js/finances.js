@@ -25,9 +25,9 @@ function subtableSpent(name) {
 
 function lineEst(e) {
   if (e.type==='subtable') {
-    // Skip inactive merch
-    if (e.subtable==='tshirts' && S.merchType!=='tshirts') return 0;
-    if (e.subtable==='hats'    && S.merchType!=='hats')    return 0;
+    // Skip inactive merch options
+    const allMerch = S.merchOptions || ['hats','tshirts'];
+    if (allMerch.includes(e.subtable) && e.subtable !== (S.merchType||'hats')) return 0;
   }
   let base=0;
   if (e.type==='fixed')    base=+(e.fixedAmt||0);
@@ -244,9 +244,9 @@ function renderFinances() {
   `;
 }
 function expRow(e,i,paying) {
-  // Skip inactive merch lines
-  if (e.type==='subtable' && e.subtable==='tshirts' && S.merchType!=='tshirts') return '';
-  if (e.type==='subtable' && e.subtable==='hats'    && S.merchType!=='hats')    return '';
+  // Skip inactive merch lines (only built-in hats/tshirts have expense rows)
+  const allMerch = S.merchOptions || ['hats','tshirts'];
+  if (e.type==='subtable' && allMerch.includes(e.subtable) && e.subtable !== (S.merchType||'hats')) return '';
 
   const est=lineEst(e), spent=lineSpent(e);
   const perTix=paying>0?Math.round(est/paying*100)/100:0;
@@ -556,9 +556,9 @@ function scrollToSection(id) {
 
 // ── Merch section ─────────────────────────────────────────────────────────────
 function stMerch() {
-  const allMerch = S.merchOptions || ['hats','tshirts'];
   const active = S.merchType || 'hats';
   const labels = {hats:'Hats', tshirts:'T-shirts', ...(S.merchLabels||{})};
+  const allMerch = S.merchOptions || ['hats','tshirts'];
   
   // Ensure custom merch options exist in S
   allMerch.forEach(key => { if(!S[key]) S[key]=[]; });
@@ -633,9 +633,15 @@ function doAddMerchOption() {
   if (!name) { alert('Please enter a name.'); return; }
   const key = name.toLowerCase().replace(/[^a-z0-9]/g,'_');
   if (!S.merchOptions) S.merchOptions = ['hats','tshirts'];
-  if (!S.merchOptions.includes(key)) S.merchOptions.push(key);
-  S[key] = [{label:'Standard',price:0,qty:0}];
-  // Store display name
+  if (!S.merchOptions.includes(key)) {
+    S.merchOptions.push(key);
+    // Add an expense subtable row for this merch option
+    S.expenses.push({
+      id: key, label: name, type:'subtable', subtable:key,
+      spent:0, notes:'', expanded:false
+    });
+  }
+  if (!S[key]) S[key] = [{label:'Standard',price:0,qty:0}];
   if (!S.merchLabels) S.merchLabels = {};
   S.merchLabels[key] = name;
   saveState(); closeModal(); renderFinances();
