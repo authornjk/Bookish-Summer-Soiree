@@ -78,6 +78,9 @@ function migrateState() {
     }
   });
 
+  // Remove prizes subtable expense line if present (no longer needed)
+  S.expenses = (S.expenses||[]).filter(e => !(e.id==='prizes' && e.type==='subtable'));
+
   // Subtables — preserve, restore if empty
   ['tshirts','hats','totes','prizes','swag','decorations','misc'].forEach(key => {
     if (!S[key] || S[key].length === 0) S[key] = JSON.parse(JSON.stringify(D[key]));
@@ -158,6 +161,7 @@ function syncHQToFirebase() {
   const authObj = {};
   (S.authors||[]).forEach(a => { authObj[a.id] = a; });
   push('/authors', authObj);
+  push('/wishlist', S.wishlist||[]);
 }
 
 // ── Helpers ──
