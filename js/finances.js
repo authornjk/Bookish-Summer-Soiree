@@ -156,11 +156,10 @@ function renderFinances() {
 
   <!-- SUBTABLES -->
   ${renderMerchSection()}
+  ${stPriceQty('totes','Tote bags')}
   ${stEstSpent('decorations','Decorations')}
   ${stEstSpent('misc','Misc expenses')}
-  ${stEstSpent('prizes','Prizes (BINGO)')}
   ${stEstSpent('swag','Swag bag')}
-  ${stPriceQty('totes','Tote bags')}
   `;
 }
 
@@ -207,10 +206,12 @@ function expRow(e, i, paying) {
       + `<div style="font-size:9px;color:var(--text3);margin-top:1px">${escHtml(e.unitLabel||'')}</div>`;
   } else if (e.type === 'cc_fee') {
     priceCell = `<div style="display:flex;align-items:center;gap:2px">
-      ${moneyIn('ecc'+i, e.ccPct||S.ccFeePercent||3.2, `blurExpField(${i},'ccPct',this.value,'money')`, 'width:52px;font-size:12px')}
+      <input type="text" inputmode="decimal" value="${(+(e.ccPct||S.ccFeePercent||3.2)).toFixed(1)}"
+        class="ni money-in" style="width:46px;font-size:12px"
+        onblur="S.expenses[${i}].ccPct=parseMoney(this.value);saveState();renderFinances()"
+        onkeydown="if(event.key==='Enter')this.blur()">
       <span style="font-size:11px;color:var(--text3)">%</span>
-    </div>
-    <div style="font-size:9px;color:var(--text3);margin-top:1px">${fmt(est)}</div>`;
+    </div>`;
   } else if (isSub) {
     priceCell = `<button class="jump-btn" onclick="scrollToId('st-${e.subtable}')">↓ Go</button>`;
   }
@@ -338,14 +339,7 @@ function openEditExpense(i) {
     <div class="field"><label>Name</label><input type="text" id="ee-name" value="${escHtml(e.label)}"></div>
     ${isCC?`<div class="field"><label>CC fee %</label><input type="text" inputmode="decimal" id="ee-cc" value="${e.ccPct||S.ccFeePercent||3.2}"></div>`:''}
     ${e.type==='fixed'?`
-      <div class="field"><label>Amount ($)</label><input type="text" inputmode="decimal" id="ee-fixed" value="${(+(e.fixedAmt||0)).toFixed(2)}"></div>
-      <div class="field"><label>Quantity based on</label>
-        <select id="ee-based-fixed">
-          <option value="none"${(e.unitLabelType||'none')==='none'?' selected':''}>Set amount (no qty)</option>
-          <option value="total"${e.unitLabelType==='total'?' selected':''}>Total attendees (${S.attendance.total})</option>
-          <option value="authors"${e.unitLabelType==='authors'?' selected':''}>Authors only (${S.attendance.authors})</option>
-        </select>
-      </div>`:''}
+      <div class="field"><label>Amount ($)</label><input type="text" inputmode="decimal" id="ee-fixed" value="${(+(e.fixedAmt||0)).toFixed(2)}"></div>`:''}
     ${isPer?`
       <div class="field"><label>Price per item ($)</label><input type="text" inputmode="decimal" id="ee-unit" value="${(+(e.unitPrice||0)).toFixed(2)}"></div>
       <div class="field"><label>Based on</label>
@@ -482,6 +476,11 @@ function renderMerchSection() {
     </div>
     <div style="font-size:11px;color:var(--text2);margin-bottom:10px">Only the active option feeds into the budget.</div>
     ${sections}
+    <div style="text-align:center;padding:10px 0 4px">
+      <button class="btn" style="font-size:11px" onclick="document.querySelector('.shell').scrollTo({top:0,behavior:'smooth'})">
+        <i class="ti ti-arrow-up"></i> Return to top
+      </button>
+    </div>
   </div>`;
 }
 
@@ -580,6 +579,11 @@ function stEstSpent(key, title) {
     </div>
     ${rowsHtml}
     ${rows.length===0?`<div style="color:var(--text3);font-size:12px;padding:8px 0">No items yet. Tap + to add one.</div>`:''}
+    <div style="text-align:center;padding:14px 0 6px">
+      <button class="btn" style="font-size:11px" onclick="document.querySelector('.shell').scrollTo({top:0,behavior:'smooth'})">
+        <i class="ti ti-arrow-up"></i> Return to top
+      </button>
+    </div>
   </div>`;
 }
 
@@ -674,7 +678,7 @@ function stPriceQty(key, title) {
     <div style="display:grid;grid-template-columns:1fr 72px 56px 64px 30px;gap:4px;padding:0 2px;margin-bottom:3px">
       <span style="font-size:10px;color:var(--text3)">Style</span>
       <span style="font-size:10px;color:var(--text3);text-align:right">Price</span>
-      <span style="font-size:10px;color:var(--text3);text-align:right">Qty</span>
+      <span style="font-size:10px;color:var(--text3);text-align:right">Qty <span style="color:var(--purple)">(${S.attendance.total} att)</span></span>
       <span style="font-size:10px;color:var(--text3);text-align:right">Total</span>
       <span></span>
     </div>
