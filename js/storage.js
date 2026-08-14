@@ -68,6 +68,14 @@ function migrateState() {
         S.expenses.push(JSON.parse(JSON.stringify(def)));
       }
     });
+    // Remove prizes subtable if present
+    S.expenses = S.expenses.filter(e => !(e.id==='prizes' && e.type==='subtable'));
+    // Re-sort to match default order (preserving user-added custom lines at end)
+    const defaultOrder = D.expenses.map(e => e.id);
+    const known = S.expenses.filter(e => defaultOrder.includes(e.id))
+      .sort((a,b) => defaultOrder.indexOf(a.id) - defaultOrder.indexOf(b.id));
+    const custom = S.expenses.filter(e => !defaultOrder.includes(e.id));
+    S.expenses = [...known, ...custom];
   }
 
   // Update per-unit qty from attendance
@@ -119,6 +127,17 @@ function migrateState() {
     S.todos = JSON.parse(JSON.stringify(DEFAULT_DATA.todos));
     S._2027reset = true;
     S._catReset  = true;
+  }
+  // Force expense re-sort (picks up new order and removes prizes subtable)
+  if (!S._expSort2) {
+    const D2 = DEFAULT_DATA;
+    const defaultOrder = D2.expenses.map(e => e.id);
+    S.expenses = S.expenses.filter(e => !(e.id==='prizes' && e.type==='subtable'));
+    const known  = S.expenses.filter(e => defaultOrder.includes(e.id))
+      .sort((a,b) => defaultOrder.indexOf(a.id) - defaultOrder.indexOf(b.id));
+    const custom = S.expenses.filter(e => !defaultOrder.includes(e.id));
+    S.expenses = [...known, ...custom];
+    S._expSort2 = true;
   }
   // Add notes field to todos missing it
   S.todos = S.todos.map(t => ({notes:'',...t}));
