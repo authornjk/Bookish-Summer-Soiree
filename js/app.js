@@ -17,6 +17,7 @@ function renderShell() {
       <div id="tab-authors-hq"  style="display:none"><div id="authors-content"></div></div>
       <div id="tab-prizes"      style="display:none"><div id="prizes-content"></div></div>
       <div id="tab-settings"    style="display:none"><div id="settings-content"></div></div>
+      <div style="height:300px;flex-shrink:0" aria-hidden="true"></div>
     </div>
     <nav class="tab-bar">
       <button class="tab-btn active" onclick="showTab('finances')"><i class="ti ti-calculator"></i>Finances</button>
