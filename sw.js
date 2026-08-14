@@ -1,15 +1,15 @@
-// v20260813.10 — network-first, always fresh
-const CACHE = 'soiree-hq-v20260813.10';
+// v20260814a — always fresh, clears all old caches
+const CACHE = 'soiree-hq-20260814a';
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(
-  caches.keys().then(ks => Promise.all(ks.map(k => caches.delete(k)))).then(() => self.clients.claim())
+  caches.keys()
+    .then(keys => Promise.all(keys.map(k => caches.delete(k))))
+    .then(() => self.clients.claim())
 ));
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   e.respondWith(
-    fetch(e.request).then(r => {
-      if (r.ok) caches.open(CACHE).then(c => c.put(e.request, r.clone()));
-      return r;
-    }).catch(() => caches.match(e.request))
+    fetch(e.request, {cache: 'no-store'})
+      .catch(() => caches.match(e.request))
   );
 });
