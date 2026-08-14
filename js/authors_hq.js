@@ -57,7 +57,7 @@ function renderAuthors() {
         <div style="font-size:13px;font-weight:600">
           ${all.filter(a=>a.status==='Confirmed').length} confirmed &nbsp;·&nbsp;
           ${Math.max(0,TOTAL_GOAL-all.filter(a=>a.status==='Confirmed').length)} still needed &nbsp;·&nbsp;
-          ${all.filter(a=>a.status==='Asked'||a.status==='Maybe').length} pending
+          ${all.filter(a=>a.status==='Asked').length} asked
         </div>
         <div style="font-size:11px;color:var(--text2);margin-top:2px">
           <strong>Q&amp;A:</strong> ${qnaConfirmed.length} confirmed, ${qnaNeeded} needed, ${qnaAsked.length} asked &nbsp;·&nbsp;
