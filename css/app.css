@@ -17,11 +17,11 @@
   --text:#f0efea;--text2:#9a9994;--text3:#65645f;
   --border:rgba(255,255,255,.1);--border2:rgba(255,255,255,.2);
 }}
-html,body{height:100%;overflow-y:auto;scroll-behavior:smooth}
+html{height:100%}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg2);color:var(--text);min-height:100%;-webkit-font-smoothing:antialiased;overflow-y:auto}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg2);color:var(--text);min-height:100%;-webkit-font-smoothing:antialiased}
 
 /* ── Layout ── */
-.shell{max-width:700px;margin:0 auto;padding:calc(var(--safe-top)+12px) 12px calc(var(--safe-bottom)+140px)}
+.shell{max-width:700px;margin:0 auto;padding:calc(var(--safe-top)+12px) 12px 400px}
 .top-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:8px;flex-wrap:wrap}
 .app-title{font-family:Georgia,serif;font-size:18px;font-weight:500}
 .app-sub{font-size:11px;color:var(--text2);margin-top:1px}
