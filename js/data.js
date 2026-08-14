@@ -23,22 +23,23 @@ const DEFAULT_DATA = {
   customLocations: [],
   inventoryCategories: ['Backdrops','Check-in','Decor','Misc','Prize table'],
 
-  // Expenses: CC fee, Venue, Food, Prizes budget, Raffle, Merch, Totes, Decorations, Misc, Swag, Photographer, Author dinner, Author gifts, Admin
+  // Expenses in desired order
   expenses: [
-    { id:'cc_fee',      label:'CC processing fee',  type:'cc_fee',   ccPct:3.2,     spent:0, notes:'3.2% per ticket', expanded:false },
-    { id:'venue',       label:'Venue',              type:'fixed',    fixedAmt:1615, spent:0, notes:'Contact venue re: setup time', expanded:false },
-    { id:'lunch',       label:'Lunch / Food',       type:'perunit',  unitPrice:15,  unitLabelType:'total', qty:175, unitLabel:'per person', spent:0, notes:'', tip:{enabled:true,type:'fixed',fixedAmt:562.50}, expanded:false },
-    { id:'raffle',      label:'Raffle prizes',      type:'fixed',    fixedAmt:600,  spent:0, notes:'', expanded:false },
-    { id:'hats',        label:'Hats (Merch)',       type:'subtable', subtable:'hats',        spent:0, notes:'', expanded:false },
-    { id:'tshirts',     label:'T-shirts (Merch)',   type:'subtable', subtable:'tshirts',     spent:0, notes:'', expanded:false },
-    { id:'totes',       label:'Tote bags',          type:'subtable', subtable:'totes',        spent:0, notes:'', expanded:false },
-    { id:'decorations', label:'Decorations',        type:'subtable', subtable:'decorations', spent:0, notes:'', expanded:false },
-    { id:'misc',        label:'Misc',               type:'subtable', subtable:'misc',         spent:0, notes:'', expanded:false },
-    { id:'swag',        label:'Swag bag stuff',     type:'subtable', subtable:'swag',         spent:0, notes:'', expanded:false },
-    { id:'photographer',label:'Photographer',       type:'fixed',    fixedAmt:450,  spent:0, notes:'', tip:{enabled:true,type:'fixed',fixedAmt:50}, expanded:false },
-    { id:'dinner',      label:'Author dinner',      type:'perunit',  unitPrice:40,  unitLabelType:'authors', qty:18, unitLabel:'per author', spent:0, notes:'', expanded:false },
-    { id:'author_gifts',label:'Author gifts',       type:'perunit',  unitPrice:1.40,unitLabelType:'authors', qty:18, unitLabel:'per author', spent:0, notes:'', expanded:false },
-    { id:'admin_pay',   label:'Admin',              type:'fixed',    fixedAmt:500,  spent:0, notes:'', expanded:false },
+    { id:'cc_fee',      label:'CC processing fee',     type:'cc_fee',   ccPct:3.2,    spent:0, notes:'~3.2% per ticket', expanded:false },
+    { id:'venue',       label:'Venue',                 type:'fixed',    fixedAmt:1615, spent:0, notes:'Contact venue re: setup time', expanded:false },
+    { id:'lunch',       label:'Lunch / Food',          type:'perunit',  unitPrice:15,  unitLabelType:'total', spent:0, notes:'', tip:{enabled:true,type:'fixed',fixedAmt:562.50}, expanded:false },
+    { id:'prizes',      label:'Prizes (BINGO)',         type:'subtable', subtable:'prizes',      spent:0, notes:'See prize manager', expanded:false },
+    { id:'raffle',      label:'Raffle prizes',          type:'fixed',    fixedAmt:600,  spent:0, notes:'', expanded:false },
+    { id:'decorations', label:'Decorations',            type:'subtable', subtable:'decorations', spent:0, notes:'', expanded:false },
+    { id:'hats',        label:'Hats',                  type:'subtable', subtable:'hats',         spent:0, notes:'', expanded:false },
+    { id:'misc',        label:'Misc',                  type:'subtable', subtable:'misc',         spent:0, notes:'', expanded:false },
+    { id:'swag',        label:'Swag bag stuff',         type:'subtable', subtable:'swag',         spent:0, notes:'', expanded:false },
+    { id:'totes',       label:'Tote bags',             type:'subtable', subtable:'totes',        spent:0, notes:'', expanded:false },
+    { id:'tshirts',     label:'T-shirts',              type:'subtable', subtable:'tshirts',      spent:0, notes:'', expanded:false },
+    { id:'photographer',label:'Photographer',           type:'fixed',    fixedAmt:450,  spent:0, notes:'', tip:{enabled:true,type:'fixed',fixedAmt:50}, expanded:false },
+    { id:'dinner',      label:'Author dinner',          type:'perunit',  unitPrice:40,  unitLabelType:'authors', spent:0, notes:'', expanded:false },
+    { id:'author_gifts',label:'Author gifts',           type:'perunit',  unitPrice:1.40,unitLabelType:'authors', spent:0, notes:'', expanded:false },
+    { id:'admin_pay',   label:'Admin',                 type:'fixed',    fixedAmt:500,  spent:0, notes:'', expanded:false },
   ],
 
   tshirts: [
