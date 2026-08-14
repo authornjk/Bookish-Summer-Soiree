@@ -28,7 +28,6 @@ const DEFAULT_DATA = {
     { id:'cc_fee',      label:'CC processing fee',  type:'cc_fee',   ccPct:3.2,     spent:0, notes:'~3.2% of ticket price per paying ticket', expanded:false },
     { id:'venue',       label:'Venue',              type:'fixed',    fixedAmt:1615, spent:0, notes:'Contact venue re: setup time', expanded:false },
     { id:'lunch',       label:'Lunch / Food',       type:'perunit',  unitPrice:15,  unitLabelType:'total', qty:175, unitLabel:'per person', spent:0, notes:'', tip:{enabled:true,type:'fixed',fixedAmt:562.50}, expanded:false },
-    { id:'prizes',      label:'Prizes (BINGO)',     type:'subtable', subtable:'prizes',      spent:0, notes:'See prize manager', expanded:false },
     { id:'raffle',      label:'Raffle prizes',      type:'fixed',    fixedAmt:600,  spent:0, notes:'', expanded:false },
     { id:'hats',        label:'Hats (Merch)',       type:'subtable', subtable:'hats',        spent:0, notes:'', expanded:false },
     { id:'tshirts',     label:'T-shirts (Merch)',   type:'subtable', subtable:'tshirts',     spent:0, notes:'', expanded:false },
