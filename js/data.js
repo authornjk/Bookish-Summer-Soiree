@@ -23,9 +23,9 @@ const DEFAULT_DATA = {
   customLocations: [],
   inventoryCategories: ['Backdrops','Check-in','Decor','Misc','Prize table'],
 
-  // Expenses in Nicole's specified order
+  // Expenses: CC fee, Venue, Food, Prizes budget, Raffle, Merch, Totes, Decorations, Misc, Swag, Photographer, Author dinner, Author gifts, Admin
   expenses: [
-    { id:'cc_fee',      label:'CC processing fee',  type:'cc_fee',   ccPct:3.2,     spent:0, notes:'~3.2% of ticket price per paying ticket', expanded:false },
+    { id:'cc_fee',      label:'CC processing fee',  type:'cc_fee',   ccPct:3.2,     spent:0, notes:'3.2% per ticket', expanded:false },
     { id:'venue',       label:'Venue',              type:'fixed',    fixedAmt:1615, spent:0, notes:'Contact venue re: setup time', expanded:false },
     { id:'lunch',       label:'Lunch / Food',       type:'perunit',  unitPrice:15,  unitLabelType:'total', qty:175, unitLabel:'per person', spent:0, notes:'', tip:{enabled:true,type:'fixed',fixedAmt:562.50}, expanded:false },
     { id:'raffle',      label:'Raffle prizes',      type:'fixed',    fixedAmt:600,  spent:0, notes:'', expanded:false },
