@@ -129,7 +129,7 @@ function migrateState() {
     S._catReset  = true;
   }
   // Force expense re-sort (picks up new order and removes prizes subtable)
-  if (!S._expSort2) {
+  if (!S._expSort2 || !S._expSort3) {
     const D2 = DEFAULT_DATA;
     const defaultOrder = D2.expenses.map(e => e.id);
     S.expenses = S.expenses.filter(e => !(e.id==='prizes' && e.type==='subtable'));
@@ -138,6 +138,7 @@ function migrateState() {
     const custom = S.expenses.filter(e => !defaultOrder.includes(e.id));
     S.expenses = [...known, ...custom];
     S._expSort2 = true;
+    S._expSort3 = true;
   }
   // Add notes field to todos missing it
   S.todos = S.todos.map(t => ({notes:'',...t}));
