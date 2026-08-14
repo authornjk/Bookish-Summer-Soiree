@@ -114,9 +114,11 @@ function migrateState() {
   if (!S.todos || S.todos.length === 0) {
     S.todos = JSON.parse(JSON.stringify(D.todos));
   }
-  if (!S._2027reset) {
-    S.todos = S.todos.map(t => ({...t, done:false, notes: t.notes||''}));
+  // Force re-apply defaults for todos to pick up categories
+  if (!S._2027reset || !S._catReset) {
+    S.todos = JSON.parse(JSON.stringify(DEFAULT_DATA.todos));
     S._2027reset = true;
+    S._catReset  = true;
   }
   // Add notes field to todos missing it
   S.todos = S.todos.map(t => ({notes:'',...t}));
