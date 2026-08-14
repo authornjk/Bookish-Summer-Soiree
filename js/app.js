@@ -123,17 +123,17 @@ function renderSettings() {
       <div class="card-title">Author data</div>
       <div style="display:flex;flex-direction:column;gap:10px">
         <div style="background:var(--bg2);border-radius:var(--radius-sm);padding:10px">
-          <div style="font-size:12px;font-weight:600;margin-bottom:3px">Restore defaults</div>
-          <div style="font-size:11px;color:var(--text2);margin-bottom:7px">Resets authors and wishlist to the built-in starting list. <strong>Your changes will be overwritten.</strong> Only use if data is completely gone.</div>
-          <button class="btn" onclick="confirmDelete('This will overwrite your current author list and wishlist with the built-in defaults. Continue?',()=>resetAuthors())">
-            <i class="ti ti-refresh"></i> Restore defaults
+          <div style="font-size:12px;font-weight:600;margin-bottom:3px">Back up authors to Firebase</div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:7px">Saves your current authors and wishlist to Firebase right now. Do this after making changes so they're safely backed up.</div>
+          <button class="btn primary" onclick="backupAuthorsToFirebase()">
+            <i class="ti ti-cloud-upload"></i> Back up now
           </button>
         </div>
         <div style="background:var(--bg2);border-radius:var(--radius-sm);padding:10px">
           <div style="font-size:12px;font-weight:600;margin-bottom:3px">Restore from Firebase</div>
-          <div style="font-size:11px;color:var(--text2);margin-bottom:7px">Pulls your author list from Firebase (the cloud backup). Use this if you've entered authors before and they disappeared. <strong>Does not overwrite if Firebase is empty.</strong></div>
-          <button class="btn primary" onclick="restoreAuthorsFromFirebase()">
-            <i class="ti ti-cloud-download"></i> Restore from Firebase
+          <div style="font-size:11px;color:var(--text2);margin-bottom:7px">Pulls your backed-up authors from Firebase. Safe to use — only restores if Firebase has data.</div>
+          <button class="btn" onclick="restoreAuthorsFromFirebase()">
+            <i class="ti ti-cloud-download"></i> Restore from backup
           </button>
         </div>
       </div>
@@ -312,6 +312,21 @@ function resetAuthors() {
   showToast('Authors and wishlist restored!');
   renderSettings();
   if (_activeTab === 'authors-hq') renderAuthors();
+}
+
+function backupAuthorsToFirebase() {
+  if (!window.FIREBASE_DB_URL) { showToast('Set Firebase URL first', 'error'); return; }
+  const authObj = {};
+  (S.authors||[]).forEach(a => { authObj[a.id] = a; });
+  Promise.all([
+    fetch(window.FIREBASE_DB_URL + '/authors.json', {
+      method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(authObj)
+    }),
+    fetch(window.FIREBASE_DB_URL + '/wishlist.json', {
+      method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(S.wishlist||[])
+    })
+  ]).then(() => showToast('Backed up ' + (S.authors||[]).length + ' authors ✓'))
+    .catch(() => showToast('Backup failed — check Firebase URL', 'error'));
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
