@@ -3,7 +3,7 @@ var _authorSwipeX = 0;
 const SK = 'soiree_hq_2027';
 let S = {};
 
-window.FIREBASE_DB_URL = localStorage.getItem('soiree_firebase_url') || 'https://soiree-prizes-default-rtdb.firebaseio.com';
+window.FIREBASE_DB_URL = localStorage.getItem('soiree_firebase_url') || 'https://soiree-prizes-2027-default-rtdb.firebaseio.com';
 window.PRIZE_APP_URL   = localStorage.getItem('soiree_prize_url')    || 'https://authornjk.github.io/BSS-Prizes';
 
 function getAdminCount() {
