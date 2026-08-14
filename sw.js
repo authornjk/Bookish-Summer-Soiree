@@ -1,5 +1,5 @@
-// v20260814a — always fresh, clears all old caches
-const CACHE = 'soiree-hq-20260814a';
+// v20260814b — always fresh, clears all old caches
+const CACHE = 'soiree-hq-20260814b';
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(
   caches.keys()
