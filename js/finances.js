@@ -22,9 +22,11 @@ function subtableTotal(name) {
 
 function lineEst(e) {
   if (e.type === 'cc_fee') {
-    const pct = +(e.ccPct || S.ccFeePercent || 3.2);
+    // CC fee = percentage of ticket price × number of paying tickets
+    const pct    = +(e.ccPct || S.ccFeePercent || 3.2);
     const paying = Math.max(0, S.attendance.total - S.attendance.authors - S.attendance.admin);
-    return Math.round(pct/100 * (+(S.ticketPrice||0)) * paying * 100) / 100;
+    const perTicket = Math.round(pct/100 * (+(S.ticketPrice||0)) * 100) / 100;
+    return Math.round(perTicket * paying * 100) / 100;
   }
   if (e.type === 'fixed')   { const b = +(e.fixedAmt||0); return Math.round((b + tipAmt(e.tip,b))*100)/100; }
   if (e.type === 'perunit') { const b = Math.round((+(e.unitPrice||0))*(+(e.qty||0))*100)/100; return Math.round((b + tipAmt(e.tip,b))*100)/100; }
@@ -477,7 +479,7 @@ function renderMerchSection() {
     <div style="font-size:11px;color:var(--text2);margin-bottom:10px">Only the active option feeds into the budget.</div>
     ${sections}
     <div style="text-align:center;padding:10px 0 4px">
-      <button class="btn" style="font-size:11px" onclick="document.querySelector('.shell').scrollTo({top:0,behavior:'smooth'})">
+      <button class="btn" style="font-size:11px" onclick="window.scrollTo({top:0,behavior:'smooth'})">
         <i class="ti ti-arrow-up"></i> Return to top
       </button>
     </div>
@@ -580,7 +582,7 @@ function stEstSpent(key, title) {
     ${rowsHtml}
     ${rows.length===0?`<div style="color:var(--text3);font-size:12px;padding:8px 0">No items yet. Tap + to add one.</div>`:''}
     <div style="text-align:center;padding:14px 0 6px">
-      <button class="btn" style="font-size:11px" onclick="document.querySelector('.shell').scrollTo({top:0,behavior:'smooth'})">
+      <button class="btn" style="font-size:11px" onclick="window.scrollTo({top:0,behavior:'smooth'})">
         <i class="ti ti-arrow-up"></i> Return to top
       </button>
     </div>
@@ -688,7 +690,7 @@ function stPriceQty(key, title) {
       <span>Total</span><span>${fmt(total)}</span>
     </div>
     <div style="text-align:center;padding:14px 0 4px">
-      <button class="btn" style="font-size:11px" onclick="document.querySelector('.shell').scrollTo({top:0,behavior:'smooth'})">
+      <button class="btn" style="font-size:11px" onclick="window.scrollTo({top:0,behavior:'smooth'})">
         <i class="ti ti-arrow-up"></i> Return to top
       </button>
     </div>
